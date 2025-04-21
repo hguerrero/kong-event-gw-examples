@@ -1,0 +1,11 @@
+contexts:
+  default:
+    brokers:
+      - localhost:9092
+  virtual:
+    brokers:
+      - localhost:19092
+  secured:
+    brokers:
+      - localhost:29092
+current-context: default

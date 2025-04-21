@@ -1,0 +1,57 @@
+virtual_clusters:
+  - name: secured
+    backend_cluster_name: kafka-localhost
+    route_by:
+      type: port
+      port:
+        listen_start: 19092
+        min_broker_id: 1
+    authentication:
+      - type: anonymous
+        mediation:
+          type: anonymous
+    consume_policies:
+      - policies:
+          - type: policy
+            policy:
+              name: decrypt
+              type: decrypt
+              spec:
+                failure:
+                  mode: error
+                decrypt:
+                  - type: value
+                key_sources:
+                  - type: static
+                    name: inline-key
+                    static:
+                      - id: "static://key-0"
+                        key:
+                          type: bytes
+                          bytes:
+                            value: "xS522eO5mOQalLOUjKP8pw=="
+    produce_policies:
+      - policies:
+          - type: policy
+            policy:
+              name: encrypt 
+              type: encrypt
+              spec:
+                failure: 
+                  mode: error
+                encrypt:
+                  - type: value
+                    id: "static://key-0"
+                key_sources:
+                  - name: inline-key
+                    type: static
+                    static:
+                      - id: "static://key-0"
+                        key:
+                          type: bytes
+                          bytes:
+                            value: "xS522eO5mOQalLOUjKP8pw=="
+backend_clusters:
+  - name: kafka-localhost
+    bootstrap_servers:
+      - localhost:9092

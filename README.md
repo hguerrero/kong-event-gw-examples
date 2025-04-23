@@ -10,25 +10,41 @@ This repository contains example configurations and docker-compose files demonst
 ## Examples
 
 ### 1. Basic Proxy (`examples/01-basic-proxy`)
-Basic setup demonstrating Kafka proxy functionality with anonymous authentication.
+Basic setup demonstrating Kafka proxy functionality:
+- Simple proxy configuration
+- Anonymous authentication
+- Direct pass-through of Kafka operations
+- Ideal for development environments and testing
 
 ### 2. Topic Rewrite (`examples/02-topic-rewrite`)
-Shows how to configure topic name rewriting using prefixes.
+Shows how to configure topic name rewriting using prefixes:
+- Automatic topic name rewriting
+- Prefix-based topic transformation
+- Transparent operation for clients
+- Ideal for multi-tenant environments and namespace isolation
 
 ### 3. Authentication Mediation (`examples/03-auth-mediation`)
 Demonstrates JWT authentication configuration with two clusters:
 - Anonymous authentication cluster (port 19092)
 - JWT-authenticated cluster (port 29092)
+- Separate authentication methods per virtual cluster
+- Perfect for mixed security requirements and gradual security implementation
 
 ### 4. Encryption (`examples/04-encryption`)
 Showcases message-level encryption/decryption capabilities:
 - Automatic encryption of produced messages
 - Automatic decryption of consumed messages
-- Uses symmetric key encryption
+- Uses symmetric key encryption (128-bit)
 - Includes key generation scripts (`generate_key.sh`)
+- Messages encrypted at rest in Kafka
 
 ### 5. Schema Validation (`examples/05-schema-validation`)
-Example of schema validation configuration.
+Example of schema validation configuration:
+- Message schema validation
+- Integration with Schema Registry
+- Validation before message production
+- Error handling for invalid messages
+- Ideal for ensuring data quality and contract-first development
 
 ### Additional Examples
 - Redpanda Integration (`examples/A1-redpanda`)
@@ -38,6 +54,7 @@ Example of schema validation configuration.
 Each example directory contains:
 - `config.yaml`: Kong Event Gateway configuration
 - `docker-compose.yaml`: Required services configuration
+- `README.md`: Detailed documentation and usage instructions
 
 To run any example:
 
@@ -71,6 +88,47 @@ The main docker-compose file includes:
 Required environment variables for Kong Event Gateway:
 - `KONNECT_CP_HOST`: Konnect Control Plane host
 - `KONNECT_PAT`: Personal Access Token
+
+## Common Use Cases
+
+1. Development and Testing
+   - Use the Basic Proxy example
+   - Anonymous authentication
+   - Direct pass-through functionality
+
+2. Multi-tenant Environments
+   - Topic Rewrite example for namespace isolation
+   - Authentication Mediation for security
+   - Schema Validation for data governance
+
+3. Security Implementation
+   - Authentication Mediation for access control
+   - Encryption for data protection
+   - Multiple authentication methods
+
+4. Data Quality
+   - Schema Validation for message format enforcement
+   - Topic Rewrite for organizational standards
+   - Error handling and validation
+
+## Troubleshooting
+
+Common issues across examples:
+
+1. Connection Issues
+   - Verify services are running (`docker ps`)
+   - Check port availability
+   - Confirm environment variables are set
+
+2. Authentication Problems
+   - Verify correct context in kafkactl
+   - Check JWT token validity
+   - Confirm proxy port usage
+
+3. Configuration
+   - Validate config.yaml syntax
+   - Check service dependencies
+   - Verify network connectivity
 
 ## License
 

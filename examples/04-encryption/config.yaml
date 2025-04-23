@@ -29,7 +29,7 @@ virtual_clusters:
                         key:
                           type: bytes
                           bytes:
-                            value: "xS522eO5mOQalLOUjKP8pw=="
+                            value: "YOUR_GENERATED_KEY"
     produce_policies:
       - policies:
           - type: policy
@@ -50,7 +50,7 @@ virtual_clusters:
                         key:
                           type: bytes
                           bytes:
-                            value: "xS522eO5mOQalLOUjKP8pw=="
+                            value: "YOUR_GENERATED_KEY"
 backend_clusters:
   - name: kafka-localhost
     bootstrap_servers:

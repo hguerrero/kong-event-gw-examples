@@ -16,21 +16,29 @@ Basic setup demonstrating Kafka proxy functionality:
 - Direct pass-through of Kafka operations
 - Ideal for development environments and testing
 
-### 2. Topic Rewrite (`examples/02-topic-rewrite`)
-Shows how to configure topic name rewriting using prefixes:
-- Automatic topic name rewriting
-- Prefix-based topic transformation
+### 2. Topic Alias (`examples/02-topic-alias`)
+Shows how to configure topic name aliasing using CEL expressions:
+- Dynamic topic name transformation
+- Bidirectional name mapping
+- Predefined name aliases
+- Transparent operation for clients
+- Ideal for standardizing naming conventions
+
+### 3. Topic Filter (`examples/03-topic-filter`)
+Shows how to configure automatic topic name filtering:
+- Automatic topic name prefixing
+- Prefix-based topic filtering
 - Transparent operation for clients
 - Ideal for multi-tenant environments and namespace isolation
 
-### 3. Authentication Mediation (`examples/03-auth-mediation`)
+### 4. Authentication Mediation (`examples/04-auth-mediation`)
 Demonstrates JWT authentication configuration with two clusters:
 - Anonymous authentication cluster (port 19092)
 - JWT-authenticated cluster (port 29092)
 - Separate authentication methods per virtual cluster
 - Perfect for mixed security requirements and gradual security implementation
 
-### 4. Encryption (`examples/04-encryption`)
+### 5. Encryption (`examples/05-encryption`)
 Showcases message-level encryption/decryption capabilities:
 - Automatic encryption of produced messages
 - Automatic decryption of consumed messages
@@ -38,7 +46,7 @@ Showcases message-level encryption/decryption capabilities:
 - Includes key generation scripts (`generate_key.sh`)
 - Messages encrypted at rest in Kafka
 
-### 5. Schema Validation (`examples/05-schema-validation`)
+### 6. Schema Validation (`examples/06-schema-validation`)
 Example of schema validation configuration:
 - Message schema validation
 - Integration with Schema Registry
@@ -97,7 +105,7 @@ Required environment variables for Kong Event Gateway:
    - Direct pass-through functionality
 
 2. Multi-tenant Environments
-   - Topic Rewrite example for namespace isolation
+   - Topic Filter example for namespace isolation
    - Authentication Mediation for security
    - Schema Validation for data governance
 
@@ -108,7 +116,7 @@ Required environment variables for Kong Event Gateway:
 
 4. Data Quality
    - Schema Validation for message format enforcement
-   - Topic Rewrite for organizational standards
+   - Topic Filter for organizational standards
    - Error handling and validation
 
 ## Troubleshooting

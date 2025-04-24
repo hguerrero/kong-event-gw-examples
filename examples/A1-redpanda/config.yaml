@@ -1,0 +1,17 @@
+virtual_clusters:
+  - name: proxy
+    backend_cluster_name: redpanda-localhost
+    route_by:
+      type: port
+      port:
+        listen_start: 10000
+        min_broker_id: 1
+        advertise_host: localhost
+    authentication:
+      - type: anonymous
+        mediation:
+          type: use_backend_cluster
+backend_clusters:
+  - name: redpanda-localhost
+    bootstrap_servers:
+      - localhost:9092

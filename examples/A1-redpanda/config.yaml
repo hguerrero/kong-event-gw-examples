@@ -4,7 +4,7 @@ virtual_clusters:
     route_by:
       type: port
       port:
-        listen_start: 10000
+        listen_start: 9192
         min_broker_id: 1
         advertise_host: localhost
     authentication:

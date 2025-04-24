@@ -1,0 +1,24 @@
+version: '3'
+services:
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: kafka
+    network_mode: host
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list" ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  kiburi:
+    image: kong/kiburi:0.0.1
+    container_name: kiburi
+    depends_on:
+      - kafka
+    network_mode: host
+    environment:
+      KONNECT_CP_HOST: my-konnect-host
+      KONNECT_PAT: my-pat-token
+    volumes:
+      - ./config.yaml:/var/config/kiburi/config.yaml
+    command: local --config /var/config/kiburi/config.yaml

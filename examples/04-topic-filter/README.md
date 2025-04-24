@@ -1,12 +1,12 @@
-# Topic Rewrite Example
+# Topic Filter Example
 
-This example demonstrates how to configure Kong Event Gateway to automatically rewrite topic names using prefixes.
+This example demonstrates how to configure Kong Event Gateway to automatically filter topic names using prefixes.
 
 ## Overview
 
 The setup provides:
-- Automatic topic name rewriting
-- Prefix-based topic transformation
+- Automatic topic name prefixing
+- Prefix-based topic filtering
 - Transparent operation for clients
 - Anonymous authentication for easy testing
 
@@ -33,7 +33,7 @@ You should see two containers running:
 
 ## Configuration Details
 
-The `config.yaml` file demonstrates topic rewriting configuration:
+The `config.yaml` file demonstrates topic filtering configuration:
 
 ```yaml
 virtual_clusters:
@@ -55,13 +55,14 @@ virtual_clusters:
 ```
 
 Key configuration points:
-- Topic rewriting enabled with prefix "proxy."
+- Topic filtering enabled with prefix "proxy."
 - All topics accessed through the proxy will be prefixed
 - Original topic names preserved in the client view
+- Transparent prefix handling for clients
 
 ## Testing
 
-Using kafkactl, test the topic rewriting:
+Using kafkactl, test the topic filtering:
 
 1. Create and use a topic through the proxy:
 ```bash
@@ -81,7 +82,7 @@ kafkactl topic list
 ## Directory Structure
 
 ```
-02-topic-rewrite/
+04-topic-filter/
 ├── config.yaml           # Gateway configuration
 ├── docker-compose.yaml   # Service definitions
 └── README.md            # This file
@@ -95,7 +96,7 @@ Required environment variables:
 
 ## Use Cases
 
-This topic rewrite setup is ideal for:
+This topic filter setup is ideal for:
 - Multi-tenant environments
 - Topic namespace isolation
 - Environment segregation
@@ -108,7 +109,7 @@ Common issues:
 1. Topics not appearing with prefix:
    - Verify the proxy configuration is loaded correctly
    - Ensure you're connecting through the proxy port (19092)
-   - Check if topic rewrite rules are correctly configured
+   - Check if topic filter rules are correctly configured
 
 2. Cannot access original topic names:
    - This is expected - always use unprefixed names through the proxy
@@ -117,16 +118,18 @@ Common issues:
 ## Limitations
 
 - Single prefix for all topics
-- No regex-based rewriting
-- No conditional rewriting
+- No regex-based filtering
+- No conditional prefixing
 - Prefix cannot be changed dynamically
 
 ## Next Steps
 
 Explore other examples:
-- Authentication (03-auth-mediation)
-- Message encryption (04-encryption)
-- Schema validation (05-schema-validation)
+- Basic Proxy (01-basic-proxy)
+- Topic Alias (02-topic-alias)
+- Authentication Mediation (03-auth-mediation)
+- Encryption (05-encryption)
+- Schema Validation (06-schema-validation)
 
 ## Related Documentation
 

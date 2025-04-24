@@ -1,0 +1,45 @@
+virtual_clusters:
+  - name: proxy
+    backend_cluster_name: kafka-localhost
+    route_by:
+      type: port
+      port:
+        listen_start: 19092
+        min_broker_id: 1
+    authentication:
+      - type: anonymous
+        mediation:
+          type: anonymous
+    topic_rewrite:
+      type: cel
+      cel:
+        virtual_to_backend_expression: >
+          {
+            "Jonathan":"Jon",
+            "Katherine":"Kate",
+            "William":"Will",
+            "Elizabeth":"Liz"
+          }.has(topic.name) ? 
+          {
+            "Jonathan":"Jon",
+            "Katherine":"Kate",
+            "William":"Will",
+            "Elizabeth":"Liz"
+          }[topic.name] : topic.name
+        backend_to_virtual_expression: >
+          {
+            "Jon":"Jonathan",
+            "Kate":"Katherine",
+            "Will":"William",
+            "Liz":"Elizabeth"
+          }.has(topic.name) ? 
+          {
+            "Jon":"Jonathan",
+            "Kate":"Katherine",
+            "Will":"William",
+            "Liz":"Elizabeth"
+          }[topic.name] : topic.name
+backend_clusters:
+  - name: kafka-localhost
+    bootstrap_servers:
+      - localhost:9092

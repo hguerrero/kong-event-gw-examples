@@ -1,13 +1,9 @@
 name: redpanda-quickstart-one-broker
-volumes:
-  redpanda-0: null
 services:
   redpanda-0:
-    image: docker.redpanda.com/redpandadata/redpanda:v25.1.1
+    image: docker.redpanda.com/redpandadata/redpanda:v22.2.13
     container_name: redpanda-0
     network_mode: host
-    volumes:
-      - redpanda-0:/var/lib/redpanda/data
     command:
       - redpanda
       - start
@@ -30,6 +26,8 @@ services:
       # Tells Seastar (the framework Redpanda uses under the hood) to use 1 core on the system.
       - --smp 1
       - --default-log-level=info
+      - --set node_id=1
+      - --set node_id_overrides='{node_id:0,value:1}'
 
   kiburi:
     image: kong/kiburi:0.0.1

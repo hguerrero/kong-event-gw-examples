@@ -1,0 +1,43 @@
+{
+    "realm": "kafka-realm",
+    "enabled": true,
+    "users": [
+        {
+            "id": "kafka-user",
+            "username": "kafka",
+            "enabled": true,
+            "emailVerified": true,
+            "email": "kafka@example.com",
+            "requiredActions": [],
+            "createdTimestamp": 1711872000000,
+            "firstName": "Kafka",
+            "lastName": "User",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "kafka",
+                    "temporary": false
+                }
+            ]
+        }
+    ],
+    "clients": [
+        {
+            "clientId": "kafka-client",
+            "enabled": true,
+            "publicClient": false,
+            "secret": "secret123",
+            "serviceAccountsEnabled": true,
+            "directAccessGrantsEnabled": true,
+            "standardFlowEnabled": false,
+            "redirectUris": [
+                "*"
+            ],
+            "protocol": "openid-connect",
+            "attributes": {
+                "post.logout.redirect.uris": "*",
+                "client_authenticator_type": "client-secret"
+            }
+        }
+    ]
+}

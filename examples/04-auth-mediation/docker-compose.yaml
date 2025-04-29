@@ -22,3 +22,14 @@ services:
     volumes:
       - ./config.yaml:/var/config/kiburi/config.yaml
     command: local --config /var/config/kiburi/config.yaml
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak
+    network_mode: host    
+    environment:
+      - KC_BOOTSTRAP_ADMIN_USERNAME=admin
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=admin
+    command: start-dev --import-realm
+    volumes:
+      - ./realm-export.json:/opt/keycloak/data/import/realm-export.json

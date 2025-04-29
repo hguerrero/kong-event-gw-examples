@@ -10,18 +10,21 @@ virtual_clusters:
       - type: anonymous
         mediation:
           type: anonymous
-  - name: jwt-auth
+  - name: secured
     backend_cluster_name: kafka-localhost
     route_by:
       type: port
       port:
         listen_start: 29092
         min_broker_id: 1
-    auth:
-      mode: jwt
-      jwt:
-        keys:
-          - '{"kty":"RSA","e":"AQAB","use":"sig","kid":"GZwbBhe0OnXP0duz1WzUbojs_5TwWgh4akgKMpWMUvg","alg":"RS256","n":"jALfeV5oA-l9TvZEN4T6Il4BeFKI6S_3328OzOzIv9Pgn4KPTQkNUwux1OmC8Zgsx2x1HhrzYF_CKjHSxBSROuAe-VU0H7DzxnBrnky5kbYhPnOTe3-u55sEzk41iAqlqx6Ofk4VhV8wfwmqZD1r9pIVvzUnSzKxNaD9BHeNNAGoPNdiLDz3RiO1599Y5SjPHxBpp2H8zFBhdfkAQh_oAcyK1kPg1h3TtosCo7NXZwlqYBgUjHENOUzdmQjdbgqVNrW6sqTm_juOMDjfNgGivO6XF09kn1qIIXYBtS1GGXklQpSalqHd82yuRTdupiBL60-xKc2GseXEvgimGBKqxQ"}'
+    authentication:
+      - type: sasl_oauth_bearer
+        sasl_oauth_bearer:
+          jwks:
+            endpoint: http://localhost:8080/realms/kafka-realm/protocol/openid-connect/certs
+            refresh: "1s"
+        mediation:
+          type: anonymous
 backend_clusters:
   - name: kafka-localhost
     bootstrap_servers:

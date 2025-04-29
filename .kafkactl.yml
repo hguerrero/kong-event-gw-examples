@@ -2,10 +2,22 @@ contexts:
   default:
     brokers:
       - localhost:9092
+  backend:
+    brokers:
+      - localhost:9092
   virtual:
     brokers:
       - localhost:19092
+  team-a:
+    brokers:
+      - localhost:19092
+  redpanda:
+    brokers:
+      - localhost:9192
   secured:
+    brokers:
+      - localhost:29092
+  team-b:
     brokers:
       - localhost:29092
 current-context: default

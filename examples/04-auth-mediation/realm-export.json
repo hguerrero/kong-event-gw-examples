@@ -29,7 +29,7 @@
             "secret": "secret123",
             "serviceAccountsEnabled": true,
             "directAccessGrantsEnabled": true,
-            "standardFlowEnabled": false,
+            "standardFlowEnabled": true,
             "redirectUris": [
                 "*"
             ],

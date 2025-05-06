@@ -10,6 +10,8 @@ The setup provides:
 - Transparent operation for clients
 - Anonymous authentication for easy testing
 
+![topic-filter](topic-filter.jpg)
+
 ## Components
 
 - Apache Kafka broker (localhost:9092)

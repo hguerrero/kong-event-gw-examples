@@ -10,6 +10,8 @@ The setup provides:
 - Direct pass-through of Kafka operations
 - No message transformation or additional processing
 
+![basic-proxy](basic-proxy.jpg)
+
 ## Components
 
 - Apache Kafka broker (localhost:9092)

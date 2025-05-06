@@ -29,25 +29,36 @@ docker ps
 
 You should see two containers running:
 - `kafka`: The Apache Kafka broker
-- `kiburi`: The Kong Event Gateway proxy
+- `knep`: The Kong Event Gateway proxy
 
 ## Configuration Details
 
 The `config.yaml` file contains the minimal configuration needed for a Kafka proxy:
 
 ```yaml
+backend_clusters:
+  - name: kafka-localhost
+    bootstrap_servers:
+      - localhost:9092
+      - localhost:9093
+      - localhost:9094
+
 virtual_clusters:
-  - name: proxy
+  - name: team-a
     backend_cluster_name: kafka-localhost
     route_by:
       type: port
       port:
-        listen_start: 19092
         min_broker_id: 1
     authentication:
       - type: anonymous
         mediation:
           type: anonymous
+
+listeners:
+  port:
+    - listen_address: 0.0.0.0
+      listen_port_start: 19092
 ```
 
 Key configuration points:
@@ -62,17 +73,14 @@ Using kafkactl, you can test both direct and proxied connections:
 1. Direct connection to Kafka:
 ```bash
 kafkactl config use-context default
-kafkactl topic create test-topic
-kafkactl produce test-topic --value="Hello World"
-kafkactl consume test-topic
+kafkactl create topic a-first-topic b-second-topic b-third-topic fourth-topic
+kafkactl produce a-first-topic --value="Hello World"
 ```
 
 2. Connection through proxy:
 ```bash
 kafkactl config use-context virtual
-kafkactl topic create test-topic
-kafkactl produce test-topic --value="Hello World"
-kafkactl consume test-topic
+kafkactl consume a-first-topic --from-beginning --exit
 ```
 
 ## Directory Structure
@@ -133,3 +141,19 @@ After mastering this basic setup, explore other examples:
 
 - [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)
 - [Kafka Documentation](https://kafka.apache.org/documentation/)
+
+## Cleanup
+
+When you're done experimenting with this example, you can clean up the resources:
+
+1. Stop and remove the containers:
+```bash
+docker-compose down
+```
+
+2. Verify all containers have been removed:
+```bash
+docker ps -a | grep -E 'kafka|knep'
+```
+
+This will stop all services and remove the containers, but preserve your configuration files for future use.

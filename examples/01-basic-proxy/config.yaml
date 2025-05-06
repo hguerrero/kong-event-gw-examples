@@ -1,16 +1,23 @@
+backend_clusters:
+  - name: kafka-localhost
+    bootstrap_servers:
+      - localhost:9092
+      - localhost:9093
+      - localhost:9094
+
 virtual_clusters:
-  - name: proxy
+  - name: team-a
     backend_cluster_name: kafka-localhost
     route_by:
       type: port
       port:
-        listen_start: 19092
         min_broker_id: 1
     authentication:
       - type: anonymous
         mediation:
           type: anonymous
-backend_clusters:
-  - name: kafka-localhost
-    bootstrap_servers:
-      - localhost:9092
+
+listeners:
+  port:
+    - listen_address: 0.0.0.0
+      listen_port_start: 19092

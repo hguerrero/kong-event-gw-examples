@@ -1,0 +1,29 @@
+services:
+  knep-docker:
+    image: kong/kong-native-event-proxy:latest
+    container_name: knep
+    ports:
+      - "8080:8080"
+      - "9092:9092"
+    environment:
+      KONNECT_API_TOKEN: ${KONNECT_TOKEN}
+      KONNECT_API_HOSTNAME: us.api.konghq.com
+      KONNECT_CONTROL_PLANE_ID: ${KONNECT_CONTROL_PLANE_ID}
+      KNEP__RUNTIME__DRAIN_DURATION: 1s # makes shutdown quicker, not recommended to be set like this in production 
+      # KNEP__OBSERVABILITY__LOG_FLAGS: "info,knep=debug" # Uncomment for debug logging
+    healthcheck:
+      test: curl -f http://localhost:8080/health/probes/liveness
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./config/certs:/var/tls
+    secrets:
+      - confluent_cloud_username
+      - confluent_cloud_password
+
+secrets:
+  confluent_cloud_username:
+    file: ./config/username.txt
+  confluent_cloud_password:
+    file: ./config/password.txt

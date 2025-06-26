@@ -31,7 +31,7 @@ docker ps
 
 You should see two containers running:
 - `kafka`: The Apache Kafka broker
-- `knep`: The Kong Event Gateway proxy
+- `knep-docker`: The Kong Event Gateway proxy
 
 ## Configuration Details
 
@@ -97,8 +97,9 @@ kafkactl consume a-first-topic --from-beginning --exit
 ## Environment Variables
 
 Required environment variables for Kong Event Gateway:
-- `KONNECT_CP_HOST`: Konnect Control Plane host
-- `KONNECT_PAT`: Personal Access Token
+- `KONNECT_API_TOKEN`: Konnect API Token
+- `KONNECT_API_HOSTNAME`: Konnect API Hostname (e.g., us.api.konghq.com)
+- `KONNECT_CONTROL_PLANE_ID`: Konnect Control Plane ID
 
 Make sure to set these in your environment or update the docker-compose.yaml file before starting the services.
 
@@ -134,10 +135,11 @@ Common issues:
 ## Next Steps
 
 After mastering this basic setup, explore other examples:
-- Topic rewriting (02-topic-rewrite)
-- Authentication (03-auth-mediation)
-- Message encryption (04-encryption)
-- Schema validation (05-schema-validation)
+- Topic aliasing (02-topic-alias)
+- Topic filtering (03-topic-filter)
+- Authentication mediation (04-auth-mediation)
+- Encryption (05-encryption)
+- Schema validation (06-schema-validation)
 
 ## Related Documentation
 

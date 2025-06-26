@@ -10,18 +10,20 @@ services:
       timeout: 10s
       retries: 5
 
-  kiburi:
-    image: kong/kiburi:0.0.1
-    container_name: kiburi
+  knep:
+    image: kong/kong-native-event-proxy-dev:main
+    container_name: knep
     depends_on:
       - kafka
     network_mode: host
     environment:
-      KONNECT_CP_HOST: my-konnect-host
-      KONNECT_PAT: my-pat-token
+      # KONNECT_CP_HOST: my-konnect-host
+      # KONNECT_PAT: my-pat-token
+      # Running locally, if possible show running from Konnect!!!!
+      KNEP__LOCAL_CONFIG_FILE: /var/config/kiburi/config.yaml
+      KNEP__OBSERVABILITY__LOG_FLAGS: debug,knep=debug
     volumes:
       - ./config.yaml:/var/config/kiburi/config.yaml
-    command: local --config /var/config/kiburi/config.yaml
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest

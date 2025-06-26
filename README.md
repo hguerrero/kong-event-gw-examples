@@ -55,7 +55,12 @@ Example of schema validation configuration:
 - Ideal for ensuring data quality and contract-first development
 
 ### Additional Examples
-- Redpanda Integration (`examples/A1-redpanda`)
+- Confluent Cloud Integration (`examples/A1-confluent-cloud`)
+  - Secure connection to Confluent Cloud
+  - SASL/PLAIN authentication
+  - TLS encryption
+  - SNI-based routing
+  - Secrets management for credentials
 
 ## Quick Start
 
@@ -118,6 +123,11 @@ Required environment variables for Kong Event Gateway:
    - Schema Validation for message format enforcement
    - Topic Filter for organizational standards
    - Error handling and validation
+
+5. Cloud Integration
+   - Confluent Cloud integration for managed Kafka
+   - Secure credential management
+   - TLS and SASL authentication
 
 ## Troubleshooting
 

@@ -10,6 +10,8 @@ The setup provides:
 - JWT-authenticated access on port 29092
 - Authentication mediation between clients and Kafka
 
+![auth-mediation](auth-mediation.jpg)
+
 ## Components
 
 - Apache Kafka broker (localhost:9092)

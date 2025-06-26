@@ -1,31 +1,46 @@
+backend_clusters:
+  - name: kafka-localhost
+    bootstrap_servers:
+      - localhost:9092
+      - localhost:9093
+      - localhost:9094
+
 virtual_clusters:
-  - name: no-auth
+  - name: team-a
     backend_cluster_name: kafka-localhost
     route_by:
       type: port
       port:
-        listen_start: 19092
-        min_broker_id: 1
-    authentication:
-      - type: anonymous
-        mediation:
-          type: anonymous
-  - name: secured
-    backend_cluster_name: kafka-localhost
-    route_by:
-      type: port
-      port:
-        listen_start: 29092
         min_broker_id: 1
     authentication:
       - type: sasl_oauth_bearer
         sasl_oauth_bearer:
           jwks:
             endpoint: http://localhost:8080/realms/kafka-realm/protocol/openid-connect/certs
-            refresh: "1s"
+            timeout: "1s"
         mediation:
           type: anonymous
-backend_clusters:
-  - name: kafka-localhost
-    bootstrap_servers:
-      - localhost:9092
+    topic_rewrite:
+      type: prefix
+      prefix:
+        value: a-
+  - name: team-b
+    backend_cluster_name: kafka-localhost
+    route_by:
+      type: port
+      port:
+        offset: 10000
+        min_broker_id: 1
+    authentication:
+      - type: anonymous
+        mediation:
+          type: anonymous
+    topic_rewrite:
+      type: prefix
+      prefix:
+        value: b-
+
+listeners:
+  port:
+    - listen_address: 0.0.0.0
+      listen_port_start: 19092

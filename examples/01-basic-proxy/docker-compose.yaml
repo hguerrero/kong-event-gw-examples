@@ -3,24 +3,34 @@ services:
   kafka:
     image: apache/kafka:3.9.0
     container_name: kafka
-    network_mode: host
-    healthcheck:
-      test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list" ]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-
-  knep:
-    image: kong/kong-native-event-proxy-dev:main
-    container_name: knep
-    depends_on:
-      - kafka
-    network_mode: host
+    ports:
+      - "9092:19092"
     environment:
-    # Running locally, if possible show running from Konnect!!!!
-      # KONNECT_CP_HOST: my-konnect-host
-      # KONNECT_PAT: my-pat-token
-      KNEP__LOCAL_CONFIG_FILE: /var/config/kiburi/config.yaml
-      KNEP__OBSERVABILITY__LOG_FLAGS: debug,kiburi=debug,knep=debug
-    volumes:
-      - ./config.yaml:/var/config/kiburi/config.yaml
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: INTERNAL://kafka:9092,CONTROLLER://kafka:9093,EXTERNAL://0.0.0.0:19092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CLUSTER_ID: 'abcdefghijklmnopqrstuv'
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+
+  knep-docker:
+    image: kong/kong-native-event-proxy:latest
+    container_name: knep-docker
+    ports:
+      - "8080:8080"
+      - "19092:19092"
+    environment:
+      KONNECT_API_TOKEN: ${KONNECT_TOKEN}
+      KONNECT_API_HOSTNAME: us.api.konghq.com
+      KONNECT_CONTROL_PLANE_ID: ${KONNECT_CONTROL_PLANE_ID}
+      KNEP__RUNTIME__DRAIN_DURATION: 1s # makes shutdown quicker, not recommended to be set like this in production 
+      # KNEP__OBSERVABILITY__LOG_FLAGS: "info,knep=debug" # Uncomment for debug logging
+    healthcheck:
+      test: curl -f http://localhost:8080/health/probes/liveness
+      interval: 10s
+      timeout: 5s
+      retries: 5

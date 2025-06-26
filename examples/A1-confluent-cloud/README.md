@@ -19,9 +19,10 @@ The setup provides:
 
 ## Quick Start
 
-1. Configure your Confluent Cloud credentials:
+1. Configure your Confluent Cloud settings: 
    - Update `config/username.txt` with your Confluent Cloud API key
    - Update `config/password.txt` with your Confluent Cloud API secret
+   - Update `config/config.yaml` with your Confluent Cloud bootstrap server
 
 2. Start the services:
 ```bash
@@ -43,7 +44,7 @@ The `config/config.yaml` file demonstrates Confluent Cloud integration:
 backend_clusters:
   - name: confluent-cloud
     bootstrap_servers: 
-      - pkc-921jm.us-east-2.aws.confluent.cloud:9092
+      - <replace-with-your-bootstrap-server>
     authentication:
       type: sasl_plain
       sasl_plain:

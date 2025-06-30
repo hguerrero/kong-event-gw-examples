@@ -76,7 +76,7 @@ cat << EOF > .kafkactl.yml
 contexts:
   confluent:
     brokers:
-      - team-c.127-0-0-1.sslip.io:9092
+      - bootstrap.team-c.127-0-0-1.sslip.io:9092
     tls:
       enabled: true
       insecure_skip_verify: true
@@ -124,9 +124,10 @@ Common issues:
 
 1. Authentication failures:
    - Verify your Confluent Cloud API key and secret are correct
+   - Check that you have the correct permissions for the API key
    - Check if the credentials files are properly mounted as secrets
    - Ensure the Confluent Cloud cluster is accessible
-
+   
 2. TLS connection issues:
    - Verify TLS certificates are properly configured
    - Check SNI configuration in client tools
@@ -159,5 +160,4 @@ When you're done experimenting with this example, you can clean up the resources
 ```bash
 docker-compose down
 ```
-
 

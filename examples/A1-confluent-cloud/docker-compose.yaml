@@ -1,3 +1,5 @@
+version: '3'
+name: kong-event-gateway
 services:
   knep-docker:
     image: kong/kong-native-event-proxy:latest
@@ -5,10 +7,9 @@ services:
     ports:
       - "8080:8080"
       - "9092:9092"
+    env_file:
+      - ../../konnect.env
     environment:
-      KONNECT_API_TOKEN: ${KONNECT_TOKEN}
-      KONNECT_API_HOSTNAME: us.api.konghq.com
-      KONNECT_CONTROL_PLANE_ID: ${KONNECT_CONTROL_PLANE_ID}
       KNEP__RUNTIME__DRAIN_DURATION: 1s # makes shutdown quicker, not recommended to be set like this in production 
       # KNEP__OBSERVABILITY__LOG_FLAGS: "info,knep=debug" # Uncomment for debug logging
     healthcheck:

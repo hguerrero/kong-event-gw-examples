@@ -1,7 +1,7 @@
 backend_clusters:
   - name: confluent-cloud
     bootstrap_servers: 
-      - <bootstrap-server>
+      - <replace-with-your-bootstrap-server>:<replace-with-your-port>
     authentication:
       type: sasl_plain
       sasl_plain:

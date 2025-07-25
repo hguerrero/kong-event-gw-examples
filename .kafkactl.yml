@@ -1,23 +1,37 @@
 contexts:
-  default:
-    brokers:
-      - localhost:9092
-  backend:
-    brokers:
-      - localhost:9092
-  virtual:
-    brokers:
-      - localhost:19092
-  team-a:
-    brokers:
-      - localhost:19092
-  redpanda:
-    brokers:
-      - localhost:9192
-  secured:
-    brokers:
-      - localhost:29092
-  team-b:
-    brokers:
-      - localhost:29092
+    backend:
+        brokers:
+            - localhost:9092
+    default:
+        brokers:
+            - localhost:9092
+    secured:
+        brokers:
+            - localhost:29092
+    team-a:
+        brokers:
+            - localhost:19092
+    team-b:
+        brokers:
+            - localhost:29092
+    virtual:
+        brokers:
+            - localhost:19092
+    team-c:
+        brokers:
+            - bootstrap.team-c.127-0-0-1.sslip.io:9092
+        tls:
+            enabled: true
+            insecure: true
+    confluent:
+        brokers:
+            - bootstrap.team-c.127-0-0-1.sslip.io:9092
+        tls:
+            enabled: true
+            insecure: true
+        sasl:
+            enabled: true
+            mechanism: plaintext
+            username: <YOUR_USERNAME>
+            password: <YOUR_PASSWORD>
 current-context: default

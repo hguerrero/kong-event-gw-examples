@@ -1,0 +1,39 @@
+backend_clusters:
+  - name: confluent-cloud
+    bootstrap_servers: 
+      - <replace-with-your-bootstrap-server>:<replace-with-your-port>
+    authentication:
+      type: sasl_plain
+      sasl_plain:
+        username:
+          type: file
+          file:
+            path: /run/secrets/confluent_cloud_username
+        password:
+          type: file
+          file:
+            path: /run/secrets/confluent_cloud_password
+    tls:
+      insecure_skip_verify: true
+listeners:
+  sni:
+    - cert:
+        file:
+          path: /var/tls/tls.crt
+        type: file
+      key:
+        file:
+          path: /var/tls/tls.key
+        type: file
+      listen_address: 0.0.0.0
+      listen_port: 9092
+      sni_suffix: .127-0-0-1.sslip.io
+virtual_clusters:
+  - authentication:
+      - type: sasl_plain
+        mediation:
+          type: forward
+    backend_cluster_name: confluent-cloud
+    name: team-c
+    route_by:
+      type: sni

@@ -1,37 +1,29 @@
 contexts:
-    backend:
-        brokers:
-            - localhost:9092
     default:
-        brokers:
-            - localhost:9092
-    secured:
-        brokers:
-            - localhost:29092
+      brokers:
+        - localhost:9092
+    core-proxy:
+      brokers:
+        - localhost:19092
     team-a:
-        brokers:
-            - localhost:19092
+      brokers:
+        - localhost:19192
     team-b:
-        brokers:
-            - localhost:29092
-    virtual:
-        brokers:
-            - localhost:19092
-    team-c:
-        brokers:
-            - bootstrap.team-c.127-0-0-1.sslip.io:9092
-        tls:
-            enabled: true
-            insecure: true
-    confluent:
-        brokers:
-            - bootstrap.team-c.127-0-0-1.sslip.io:9092
-        tls:
-            enabled: true
-            insecure: true
-        sasl:
-            enabled: true
-            mechanism: plaintext
-            username: <YOUR_USERNAME>
-            password: <YOUR_PASSWORD>
-current-context: default
+      brokers:
+        - localhost:19292
+    team-b-authed:
+      brokers:
+        - localhost:19292
+      sasl:
+        enabled: true
+        username: team-b-user
+        password: secret
+    team-b-schema:
+      brokers:
+        - localhost:19292
+      sasl:
+        enabled: true
+        username: team-b-user
+        password: secret
+      schemaRegistry:
+        url: http://localhost:8080/apis/ccompat/v7

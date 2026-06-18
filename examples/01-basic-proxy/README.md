@@ -1,163 +1,83 @@
 # Basic Kafka Proxy Example
 
-This example demonstrates the basic proxy functionality of Kong Event Gateway, allowing clients to connect to a Kafka cluster through a proxy layer with anonymous authentication.
+This example demonstrates the basic proxy functionality of Kong Event Gateway — putting a transparent gateway in front of Kafka without touching any broker configuration.
 
-## Overview
+> **Note:** This example uses a kongctl configuration at
+> [`kongctl/config.yaml`](kongctl/config.yaml).
 
-The setup provides:
-- Simple proxy configuration for Kafka
-- Anonymous authentication
-- Direct pass-through of Kafka operations
-- No message transformation or additional processing
+## What It Does
 
-![basic-proxy](basic-proxy.jpg)
+- Registers a 3-broker Kafka cluster as a backend in Konnect
+- Creates a flat passthrough virtual cluster
+- Exposes Kafka on ports 19092-19190 with anonymous authentication
+- Gateway acts as a transparent proxy — no namespace isolation, no auth, no policies
 
-## Components
+## How to Use
 
-- Apache Kafka broker (localhost:9092)
-- Kong Event Gateway proxy (localhost:19092)
-
-## Quick Start
-
-1. Start the services:
 ```bash
-docker-compose up -d
-```
+# Prerequisites: Kafka running, cert registered, konnect.env configured
+# See root README for bootstrap instructions.
 
-2. Verify the services are running:
-```bash
-docker ps
-```
+# Apply the phase configuration:
+kongctl apply -f kongctl/config.yaml
 
-You should see two containers running:
-- `kafka`: The Apache Kafka broker
-- `knep-docker`: The Kong Event Gateway proxy
+# Test with kafkactl:
+kafkactl config use-context core-proxy
+kafkactl get topics
+kafkactl create topic hello-world
+kafkactl produce hello-world --value="Hello via KEG!"
+kafkactl consume hello-world --from-beginning --exit
+```
 
 ## Configuration Details
 
-The `config.yaml` file contains the minimal configuration needed for a Kafka proxy:
+The configuration in `phase-1-basic-proxy.yaml` defines:
 
-```yaml
-backend_clusters:
-  - name: kafka-localhost
-    bootstrap_servers:
-      - localhost:9092
-      - localhost:9093
-      - localhost:9094
+- **Backend cluster**: Points to the 3 Kafka brokers (kafka1:9092, kafka2:9092, kafka3:9092)
+- **Listener**: Port range 19092-19190, with a `forward_to_virtual_cluster` policy
+- **Virtual cluster**: Flat passthrough (`acl_mode: passthrough`), anonymous authentication
 
-virtual_clusters:
-  - name: team-a
-    backend_cluster_name: kafka-localhost
-    route_by:
-      type: port
-      port:
-        min_broker_id: 1
-    authentication:
-      - type: anonymous
-        mediation:
-          type: anonymous
+## Key Concepts
 
-listeners:
-  port:
-    - listen_address: 0.0.0.0
-      listen_port_start: 19092
-```
-
-Key configuration points:
-- Virtual cluster listening on port 19092
-- Anonymous authentication for easy testing
-- Direct routing to backend Kafka cluster
+- **Backend Cluster**: Defines the upstream Kafka brokers the gateway connects to
+- **Listener**: A port or port range that clients connect to
+- **Virtual Cluster**: A tenant/domain isolation unit that maps clients to a backend
+- **Port Mapping**: Routes traffic from a listener port range to a specific virtual cluster
 
 ## Testing
 
 Using kafkactl, you can test both direct and proxied connections:
 
-1. Direct connection to Kafka:
 ```bash
+# Direct connection to Kafka:
 kafkactl config use-context default
-kafkactl create topic a-first-topic b-second-topic b-third-topic fourth-topic
-kafkactl produce a-first-topic --value="Hello World"
+kafkactl get topics
+
+# Connection through gateway proxy:
+kafkactl config use-context core-proxy
+kafkactl get topics
 ```
 
-2. Connection through proxy:
+Both should show the same topics — the gateway is transparent.
+
+## Lifecycle
+
+When you move to the next phase, apply the new phase file — it replaces the entire configuration:
+
 ```bash
-kafkactl config use-context virtual
-kafkactl consume a-first-topic --from-beginning --exit
+kongctl apply -f ../03-topic-filter/kongctl/config.yaml
 ```
-
-## Directory Structure
-
-```
-01-basic-proxy/
-├── config.yaml           # Gateway configuration
-├── docker-compose.yaml   # Service definitions
-└── README.md            # This file
-```
-
-## Environment Variables
-
-Required environment variables for Kong Event Gateway:
-- `KONNECT_API_TOKEN`: Konnect API Token
-- `KONNECT_API_HOSTNAME`: Konnect API Hostname (e.g., us.api.konghq.com)
-- `KONNECT_CONTROL_PLANE_ID`: Konnect Control Plane ID
-
-Make sure to set these in your environment or update the docker-compose.yaml file before starting the services.
-
-## Use Cases
-
-This basic proxy setup is ideal for:
-- Learning and testing Kong Event Gateway
-- Development environments
-- Simple Kafka proxy needs
-- Network segmentation scenarios
-
-## Troubleshooting
-
-Common issues:
-
-1. Connection refused:
-   - Verify all services are running (`docker ps`)
-   - Check if ports are available (19092 for proxy, 9092 for Kafka)
-   - Ensure KONNECT environment variables are set correctly
-
-2. Topics not visible:
-   - Verify Kafka broker is healthy
-   - Check if you're using the correct kafkactl context
-   - Ensure proxy is properly connected to the backend cluster
-
-## Limitations
-
-- No authentication (uses anonymous access)
-- No message transformation
-- No topic rewriting
-- Basic networking setup (uses host network mode)
 
 ## Next Steps
 
-After mastering this basic setup, explore other examples:
-- Topic aliasing (02-topic-alias)
-- Topic filtering (03-topic-filter)
-- Authentication mediation (04-auth-mediation)
-- Encryption (05-encryption)
-- Schema validation (06-schema-validation)
+After mastering this basic setup, explore:
+- [Topic Filter](../03-topic-filter/kongctl/config.yaml) — namespace isolation  
+- [Auth Mediation](../04-auth-mediation/kongctl/config.yaml) — SASL/PLAIN authentication  
+- [ACL Enforcement](../05-acl-enforcement/kongctl/config.yaml) — gateway-level ACLs
+- [Encryption](../06-encryption/kongctl/config.yaml) — message-level encryption
+- [Schema Validation](../07-schema-validation/kongctl/config.yaml) — schema enforcement
 
-## Related Documentation
+## See Also
 
 - [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)
-- [Kafka Documentation](https://kafka.apache.org/documentation/)
-
-## Cleanup
-
-When you're done experimenting with this example, you can clean up the resources:
-
-1. Stop and remove the containers:
-```bash
-docker-compose down
-```
-
-2. Verify all containers have been removed:
-```bash
-docker ps -a | grep -E 'kafka|knep'
-```
-
-This will stop all services and remove the containers, but preserve your configuration files for future use.
+- [kongctl CLI Reference](https://konghq.com/products/kong-konnect/event-gateway)

@@ -1,148 +1,82 @@
 # Authentication Mediation Example
 
-This example demonstrates how to configure Kong Event Gateway with different authentication methods, specifically showing both anonymous and JWT authentication configurations.
+This example demonstrates how to configure Kong Event Gateway with SASL/PLAIN authentication, where credentials are terminated at the gateway and never forwarded to Kafka.
 
-## Overview
+> **Note:** This example uses a kongctl configuration at
+> [`kongctl/config.yaml`](kongctl/config.yaml).
 
-The setup provides:
-- Dual authentication configurations
-- Anonymous access on port 19092
-- JWT-authenticated access on port 29092
-- Authentication mediation between clients and Kafka
+## What It Does
 
-![auth-mediation](auth-mediation.jpg)
+- SASL/PLAIN authentication for Team B with `mediation: terminate`
+- Team A stays anonymous (network-level access)
+- Credentials are validated at the gateway — Kafka never sees them
+- Gateway handles auth so Kafka can remain in anonymous mode
 
-## Components
+## How to Use
 
-- Apache Kafka broker (localhost:9092)
-- Kong Event Gateway proxy with:
-  - Anonymous auth endpoint (localhost:19092)
-  - JWT auth endpoint (localhost:29092)
-
-## Quick Start
-
-1. Start the services:
 ```bash
-docker-compose up -d
-```
+# Apply the phase configuration:
+kongctl apply -f kongctl/config.yaml
 
-2. Verify the services are running:
-```bash
-docker ps
-```
+# Test authenticated access to Team B:
+kafkactl config use-context team-b-authed
+kafkactl get topics
 
-You should see two containers running:
-- `kafka`: The Apache Kafka broker
-- `kiburi`: The Kong Event Gateway proxy
+# Test anonymous access (still works for Team A):
+kafkactl config use-context team-a
+kafkactl get topics
+```
 
 ## Configuration Details
 
-The `config.yaml` file demonstrates two authentication configurations:
+The phase-3 configuration adds SASL/PLAIN to Team B:
 
 ```yaml
 virtual_clusters:
-  - name: no-auth
-    backend_cluster_name: kafka-localhost
-    route_by:
-      type: port
-      port:
-        listen_start: 19092
-        min_broker_id: 1
+  - ref: team-b
     authentication:
       - type: anonymous
-        mediation:
-          type: anonymous
-  - name: jwt-auth
-    backend_cluster_name: kafka-localhost
-    route_by:
-      type: port
-      port:
-        listen_start: 29092
-        min_broker_id: 1
-    auth:
-      mode: jwt
-      jwt:
-        keys:
-          # JWT configuration details
+      - type: sasl_plain
+        mediation: terminate
+        principals:
+          - username: team-b-user
+            password: secret
 ```
 
-Key configuration points:
-- Two virtual clusters with different authentication methods
-- Separate ports for different auth methods
-- JWT configuration for secured access
+### Auth Mediation Modes
+
+- **terminate**: Gateway validates credentials, then connects to Kafka anonymously
+- **forward**: Gateway forwards credentials to Kafka for backend validation
+- **use_backend_cluster**: Gateway uses the backend cluster's authentication
 
 ## Testing
 
-Using kafkactl, test both authentication methods:
-
-1. Anonymous access:
 ```bash
-kafkactl config use-context virtual
-kafkactl topic create test-topic
-kafkactl produce test-topic --value="Hello World"
+# Team B with SASL/PLAIN auth:
+kafkactl config use-context team-b-authed
+kafkactl get topics
+
+# Team B without auth (will fail if auth is required):
+kafkactl config use-context team-b
+kafkactl get topics  # May fail depending on acl_mode
+
+# Team A stays anonymous:
+kafkactl config use-context team-a
+kafkactl get topics
 ```
 
-2. JWT-authenticated access:
+## Lifecycle
+
+Phase 3 builds on Phase 2. To move to Phase 4 (ACL enforcement):
+
 ```bash
-# First, set your JWT token
-export KAFKA_TOKEN="your.jwt.token"
-kafkactl config use-context secured
-kafkactl topic create secure-topic
+kongctl apply -f ../05-acl-enforcement/kongctl/config.yaml
 ```
 
-## Directory Structure
+## See Also
 
-```
-03-auth-mediation/
-├── config.yaml           # Gateway configuration
-├── docker-compose.yaml   # Service definitions
-└── README.md            # This file
-```
-
-## Environment Variables
-
-Required environment variables:
-- `KONNECT_CP_HOST`: Konnect Control Plane host
-- `KONNECT_PAT`: Personal Access Token
-
-## Use Cases
-
-This authentication setup is ideal for:
-- Multi-tenant environments
-- Mixed security requirements
-- Development and production workloads
-- Gradual security implementation
-
-## Troubleshooting
-
-Common issues:
-
-1. JWT authentication failures:
-   - Verify JWT token is valid and not expired
-   - Check if token contains required claims
-   - Ensure correct JWT configuration in config.yaml
-
-2. Connection issues:
-   - Verify correct port usage (19092 for anonymous, 29092 for JWT)
-   - Check if services are running
-   - Confirm JWT token is properly set in environment
-
-## Limitations
-
-- Single JWT configuration per virtual cluster
-- No dynamic JWT key rotation
-- Basic JWT claim validation
-- No OAuth2 or other authentication methods
-
-## Next Steps
-
-Explore other examples:
-- Message encryption (04-encryption)
-- Schema validation (05-schema-validation)
-- Redpanda integration (A1-redpanda)
-
-## Related Documentation
-
+- [Topic Filter](../03-topic-filter/kongctl/config.yaml)
+- [ACL Enforcement](../05-acl-enforcement/kongctl/config.yaml)
+- [Encryption](../06-encryption/kongctl/config.yaml)
+- [Schema Validation](../07-schema-validation/kongctl/config.yaml)
 - [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)
-- [JWT Authentication](https://jwt.io/)
-- [Kafka Security Documentation](https://kafka.apache.org/documentation/#security)

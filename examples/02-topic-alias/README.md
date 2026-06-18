@@ -1,152 +1,100 @@
 # Topic Alias Example
 
-This example demonstrates how to configure Kong Event Gateway to perform topic name aliasing using Common Expression Language (CEL) expressions.
+This example demonstrates how to configure topic name aliasing using CEL (Common Expression Language) expressions — mapping topic names bidirectionally between what clients see and what exists on the broker.
 
-## Overview
+> **Note:** The CEL-based topic alias pattern is a more flexible alternative to the
+> prefix-based namespace isolation shown in [examples/03-topic-filter](../03-topic-filter/).
+> For this example set, prefix-based isolation is used for simplicity; CEL-based
+> renaming can be added to any virtual cluster for fine-grained name mapping.
 
-The setup provides:
-- Dynamic topic name transformation
-- Bidirectional name mapping
-- Predefined name aliases (e.g., "Jonathan" ↔ "Jon")
-- Transparent operation for clients
-- Anonymous authentication for easy testing
+## What It Does
 
-## Components
+- Dynamic topic name transformation using CEL expressions
+- Bidirectional name mapping (virtual → backend and backend → virtual)
+- Predefined name aliases (e.g., "Jonathan" ↔ "Jon", "Katherine" ↔ "Kate")
+- Transparent operation for clients — they never see the aliasing
 
-- Apache Kafka broker (localhost:9092)
-- Kong Event Gateway proxy (localhost:19092)
+## CEL Expression Pattern
 
-## Quick Start
+The core CEL expression for topic renaming:
 
-1. Start the services:
-```bash
-docker-compose up -d
+```cel
+{
+  "Jonathan": "Jon",
+  "Katherine": "Kate",
+  "William": "Will",
+  "Elizabeth": "Liz"
+}.has(topic.name) ?
+  {
+    "Jonathan": "Jon",
+    "Katherine": "Kate",
+    "William": "Will",
+    "Elizabeth": "Liz"
+  }[topic.name] : topic.name
 ```
 
-2. Verify the services are running:
-```bash
-docker ps
-```
+## How to Use with kongctl
 
-You should see two containers running:
-- `kafka`: The Apache Kafka broker
-- `kiburi`: The Kong Event Gateway proxy
-
-## Configuration Details
-
-The `config.yaml` file demonstrates topic aliasing configuration:
+To add CEL-based topic aliasing to an existing phase, add a `topic_rewrite` block to any
+virtual cluster in the kongctl YAML:
 
 ```yaml
-topic_rewrite:
-  type: cel
-  cel:
-    virtual_to_backend_expression: >
-      {
-        "Jonathan":"Jon",
-        "Katherine":"Kate",
-        "William":"Will",
-        "Elizabeth":"Liz"
-      }.has(topic.name) ? 
-      {
-        "Jonathan":"Jon",
-        "Katherine":"Kate",
-        "William":"Will",
-        "Elizabeth":"Liz"
-      }[topic.name] : topic.name
-    backend_to_virtual_expression: >
-      {
-        "Jon":"Jonathan",
-        "Kate":"Katherine",
-        "Will":"William",
-        "Liz":"Elizabeth"
-      }.has(topic.name) ? 
-      {
-        "Jon":"Jonathan",
-        "Kate":"Katherine",
-        "Will":"William",
-        "Liz":"Elizabeth"
-      }[topic.name] : topic.name
+virtual_clusters:
+  - ref: my-vc
+    # ...
+    topic_rewrite:
+      virtual_to_backend:
+        type: cel
+        cel:
+          expression: >
+            { "Jonathan":"Jon", "Katherine":"Kate" }.has(topic.name) ?
+            { "Jonathan":"Jon", "Katherine":"Kate" }[topic.name] : topic.name
+      backend_to_virtual:
+        type: cel
+        cel:
+          expression: >
+            { "Jon":"Jonathan", "Kate":"Katherine" }.has(topic.name) ?
+            { "Jon":"Jonathan", "Kate":"Katherine" }[topic.name] : topic.name
 ```
 
-Key configuration points:
-- CEL expressions for bidirectional name mapping
-- Predefined name aliases
-- Fallback to original name if no mapping exists
-- Transparent transformation for clients
+## Alternative: Prefix-Based Namespace Isolation
+
+If you need simpler team-level isolation, use the `namespace` block instead of CEL:
+
+```yaml
+virtual_clusters:
+  - ref: team-a
+    namespace:
+      mode: hide_prefix
+      prefix: "A."
+```
+
+This is the approach used in [examples/03-topic-filter](../03-topic-filter/kongctl/config.yaml).
+
+## Key Concepts
+
+- **virtual_to_backend**: Maps client-visible topic names to backend topic names
+- **backend_to_virtual**: Maps backend topic names to client-visible names
+- **CEL expressions**: Google's Common Expression Language for safe, side-effect-free transformations
 
 ## Testing
 
-Using kafkactl, test the topic aliasing:
-
-1. Create and use topics with full names:
 ```bash
-kafkactl config use-context virtual
-kafkactl topic create Jonathan
-kafkactl produce Jonathan --value="Hello World"
-kafkactl consume Jonathan
-```
+# Create a topic with aliased name through virtual cluster:
+kafkactl config use-context core-proxy
+kafkactl create topic Jonathan
 
-2. Verify the actual topic name in Kafka:
-```bash
+# The topic exists as "Jon" in Kafka:
 kafkactl config use-context default
-kafkactl topic list
-# Should see "Jon" instead of "Jonathan"
+kafkactl get topics  # Shows "Jon"
+
+# Via virtual cluster, it appears as "Jonathan":
+kafkactl config use-context core-proxy
+kafkactl get topics  # Shows "Jonathan"
 ```
 
-## Directory Structure
+## See Also
 
-```
-02-topic-alias/
-├── config.yaml           # Gateway configuration
-├── docker-compose.yaml   # Service definitions
-└── README.md            # This file
-```
-
-## Environment Variables
-
-Required environment variables:
-- `KONNECT_CP_HOST`: Konnect Control Plane host
-- `KONNECT_PAT`: Personal Access Token
-
-## Use Cases
-
-This topic alias setup is ideal for:
-- Standardizing topic naming conventions
-- Supporting legacy topic names
-- Providing friendly names for clients
-- Maintaining backward compatibility
-
-## Troubleshooting
-
-Common issues:
-
-1. Topic names not transforming:
-   - Verify the proxy configuration is loaded correctly
-   - Ensure you're connecting through the proxy port (19092)
-   - Check if the topic name matches exactly (case-sensitive)
-
-2. Unexpected topic names:
-   - Verify the CEL expressions in the configuration
-   - Check the mapping dictionary for the expected names
-   - Ensure bidirectional mappings are consistent
-
-## Limitations
-
-- Fixed name mappings (requires configuration update to change)
-- Case-sensitive name matching
-- No wildcard or pattern matching
-- Single transformation rule per direction
-
-## Next Steps
-
-Explore other examples:
-- Authentication Mediation (03-auth-mediation)
-- Topic Filter (04-topic-filter)
-- Encryption (05-encryption)
-- Schema Validation (06-schema-validation)
-
-## Related Documentation
-
-- [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)
+- [Topic Filter (prefix-based isolation)](../03-topic-filter/kongctl/config.yaml)
 - [Common Expression Language Specification](https://github.com/google/cel-spec)
-- [Kafka Documentation](https://kafka.apache.org/documentation/)
+- [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)

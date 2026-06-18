@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://northwind.internal/schemas/fraud-risk-scores/v3",
+  "title": "FraudRiskScore",
+  "description": "Fraud risk score event emitted by the Northwind risk scoring pipeline. Published to WEALTH_LA.infosec.security.fraud.risk-scores.v3.",
+  "type": "object",
+  "required": ["score", "account_id", "reason", "evaluated_at"],
+  "additionalProperties": false,
+  "properties": {
+    "score": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Normalised risk score between 0 (no risk) and 1 (highest risk)."
+    },
+    "account_id": {
+      "type": "string",
+      "description": "Northwind account identifier, e.g. NW-001234."
+    },
+    "reason": {
+      "type": "string",
+      "enum": [
+        "velocity_spike",
+        "geo_anomaly",
+        "device_fingerprint_mismatch",
+        "unusual_transfer_pattern",
+        "watchlist_match"
+      ],
+      "description": "Primary reason code for the risk score."
+    },
+    "evaluated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp of when the score was computed."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional key-value pairs for additional scoring context.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}

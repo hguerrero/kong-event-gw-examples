@@ -1,152 +1,241 @@
 # Kong Event Gateway Examples
 
-This repository contains example configurations and docker-compose files demonstrating various features of Kong Event Gateway (Kiburi).
+This repository contains progressive examples demonstrating Kong Event Gateway features using **kongctl** declarative configuration with Kong Konnect.
+
+Each example is self-contained in its own directory with its own `kongctl/config.yaml` configuration. Examples build on each other cumulatively — each includes all configuration from prior examples plus the new feature.
+
+## Architecture
+
+```
+                        ┌──────────────────┐
+                        │  Konnect Control  │
+                        │  Plane (kongctl)  │
+                        └────────┬─────────┘
+                                 │ kongctl apply
+                        ┌────────▼─────────┐
+  kafkactl ────────────►│  KEG Data Plane  │◄──── kong/kong-event-gateway:latest
+  (port 19092-19389)    │  (localhost)      │
+                        └────────┬─────────┘
+                                 │
+                        ┌────────▼─────────┐
+                        │  Kafka Cluster   │
+                        │  (3 brokers)     │
+                        │  + Apicurio SR   │
+                        └──────────────────┘
+```
 
 ## Prerequisites
 
 - Docker and Docker Compose
-- kafkactl (optional, for testing)
+- [kongctl](https://konghq.com/products/kong-konnect/event-gateway) CLI
+- [kafkactl](https://deviceinsight.github.io/kafkactl/) (optional, for testing)
+- A Kong Konnect account (free tier works)
 
-## Examples
+## One-Time Bootstrap
 
-### 1. Basic Proxy (`examples/01-basic-proxy`)
-Basic setup demonstrating Kafka proxy functionality:
-- Simple proxy configuration
-- Anonymous authentication
-- Direct pass-through of Kafka operations
-- Ideal for development environments and testing
-
-### 2. Topic Alias (`examples/02-topic-alias`)
-Shows how to configure topic name aliasing using CEL expressions:
-- Dynamic topic name transformation
-- Bidirectional name mapping
-- Predefined name aliases
-- Transparent operation for clients
-- Ideal for standardizing naming conventions
-
-### 3. Topic Filter (`examples/03-topic-filter`)
-Shows how to configure automatic topic name filtering:
-- Automatic topic name prefixing
-- Prefix-based topic filtering
-- Transparent operation for clients
-- Ideal for multi-tenant environments and namespace isolation
-
-### 4. Authentication Mediation (`examples/04-auth-mediation`)
-Demonstrates JWT authentication configuration with two clusters:
-- Anonymous authentication cluster (port 19092)
-- JWT-authenticated cluster (port 29092)
-- Separate authentication methods per virtual cluster
-- Perfect for mixed security requirements and gradual security implementation
-
-### 5. Encryption (`examples/05-encryption`)
-Showcases message-level encryption/decryption capabilities:
-- Automatic encryption of produced messages
-- Automatic decryption of consumed messages
-- Uses symmetric key encryption (128-bit)
-- Includes key generation scripts (`generate_key.sh`)
-- Messages encrypted at rest in Kafka
-
-### 6. Schema Validation (`examples/06-schema-validation`)
-Example of schema validation configuration:
-- Message schema validation
-- Integration with Schema Registry
-- Validation before message production
-- Error handling for invalid messages
-- Ideal for ensuring data quality and contract-first development
-
-### Additional Examples
-- Confluent Cloud Integration (`examples/A1-confluent-cloud`)
-  - Secure connection to Confluent Cloud
-  - SASL/PLAIN authentication
-  - TLS encryption
-  - SNI-based routing
-  - Secrets management for credentials
-
-## Quick Start
-
-Each example directory contains:
-- `config.yaml`: Kong Event Gateway configuration
-- `docker-compose.yaml`: Required services configuration
-- `README.md`: Detailed documentation and usage instructions
-
-To run any example:
+### Step 1 — Start Kafka
 
 ```bash
-cd examples/[example-directory]
-docker-compose up -d
+docker compose -f kafka/docker-compose.yaml up -d
+docker compose --profile init -f kafka/docker-compose.yaml up
 ```
+
+### Step 2 — Register the Data Plane Certificate
+
+Generate a self-signed certificate:
+
+```bash
+openssl req -new -x509 -nodes -newkey rsa:2048 \
+  -subj "/CN=event-gateway/C=US" \
+  -keyout kongctl/certs/key.crt \
+  -out    kongctl/certs/tls.crt
+```
+
+Register it in Konnect:
+
+```bash
+export KONGCTL_DEFAULT_KONNECT_PAT=<your-personal-access-token>
+kongctl apply -f kongctl/data_plane_certificate.yaml
+```
+
+Retrieve the cluster ID:
+
+```bash
+kongctl get event-gateway keg-examples-gateway --output json --jq '.id' --jq-raw-output
+```
+
+### Step 3 — Configure konnect.env
+
+```bash
+cp konnect.env.example konnect.env
+```
+
+Edit `konnect.env` with your region, domain, and cluster ID, then load the TLS identity:
+
+```bash
+printf 'KONG_KONNECT_CLIENT_CERT="%s"\n' "$(cat kongctl/certs/tls.crt)" >> konnect.env
+printf 'KONG_KONNECT_CLIENT_KEY="%s"\n'  "$(cat kongctl/certs/key.crt)"  >> konnect.env
+```
+
+### Step 4 — Start the Gateway
+
+```bash
+docker compose up -d
+```
+
+## Examples (Cumulative Phases)
+
+Apply them in order — each replaces the previous configuration with one that adds new capabilities:
+
+| # | Directory | kongctl Apply | Feature | Topic Alias |
+|---|-----------|--------------|---------|-------------|
+| 1 | [`examples/01-basic-proxy/`](examples/01-basic-proxy/README.md) | `kongctl apply -f examples/01-basic-proxy/kongctl/config.yaml` | Backend cluster + flat passthrough VC | — |
+| 2 | [`examples/03-topic-filter/`](examples/03-topic-filter/README.md) | `kongctl apply -f examples/03-topic-filter/kongctl/config.yaml` | Multi-VC namespace isolation | [`02-topic-alias`](examples/02-topic-alias/README.md) (CEL concept) |
+| 3 | [`examples/04-auth-mediation/`](examples/04-auth-mediation/README.md) | `kongctl apply -f examples/04-auth-mediation/kongctl/config.yaml` | SASL/PLAIN auth termination | — |
+| 4 | [`examples/05-acl-enforcement/`](examples/05-acl-enforcement/README.md) | `kongctl apply -f examples/05-acl-enforcement/kongctl/config.yaml` | ACL enforcement on Team B | — |
+| 5 | [`examples/06-encryption/`](examples/06-encryption/README.md) | `kongctl apply -f examples/06-encryption/kongctl/config.yaml` | Encrypt/decrypt policies | — |
+| 6 | [`examples/07-schema-validation/`](examples/07-schema-validation/README.md) | `kongctl apply -f examples/07-schema-validation/kongctl/config.yaml` | Schema validation + ACLs | — |
+
+### [1 — Basic Proxy](examples/01-basic-proxy/README.md)
+
+```bash
+kongctl apply -f examples/01-basic-proxy/kongctl/config.yaml
+kafkactl config use-context core-proxy
+kafkactl get topics
+```
+
+Registers the Kafka backend and exposes it through a flat passthrough virtual cluster. No namespace isolation, no auth, no policies — just a transparent proxy.
+
+### [2 — Topic Filter (Namespace Isolation)](examples/03-topic-filter/README.md)
+
+```bash
+kongctl apply -f examples/03-topic-filter/kongctl/config.yaml
+kafkactl config use-context team-a
+kafkactl get topics
+```
+
+Adds two namespace-isolated VCs:
+- **team-a** (ports 19192-19290): prefix `A.`
+- **team-b** (ports 19292-19390): prefix `B.`
+
+### [3 — Auth Mediation](examples/04-auth-mediation/README.md)
+
+```bash
+kongctl apply -f examples/04-auth-mediation/kongctl/config.yaml
+kafkactl config use-context team-b-authed
+kafkactl get topics
+```
+
+Adds SASL/PLAIN authentication to Team B with `mediation: terminate`.
+
+### [4 — ACL Enforcement](examples/05-acl-enforcement/README.md)
+
+```bash
+kongctl apply -f examples/05-acl-enforcement/kongctl/config.yaml
+```
+
+Switches Team B from passthrough to `enforce_on_gateway` ACL mode with explicit allow rules. Unauthenticated requests to Team B are now rejected.
+
+### [5 — Message Encryption](examples/06-encryption/README.md)
+
+```bash
+export TRANSACTION_ENCRYPTION_KEY=$(openssl rand -base64 32)
+kongctl apply -f examples/06-encryption/kongctl/config.yaml
+```
+
+Adds field-level encryption for high-value wire transfer events (produce encrypt, consume decrypt).
+
+### [6 — Schema Validation](examples/07-schema-validation/README.md)
+
+```bash
+export TRANSACTION_ENCRYPTION_KEY=$(openssl rand -base64 32)
+kongctl apply -f examples/07-schema-validation/kongctl/config.yaml
+```
+
+Adds Apicurio Schema Registry with schema validation on fraud risk score topics.
+
+## Variants (Alternative Backends)
+
+These replace the local Kafka backend entirely (apply instead of the phases above):
+
+| Directory | kongctl Apply | Backend |
+|-----------|--------------|---------|
+| [`examples/A1-confluent-cloud/`](examples/A1-confluent-cloud/README.md) | `kongctl apply -f examples/A1-confluent-cloud/kongctl/config.yaml` | Confluent Cloud (SASL/PLAIN + TLS) |
+| [`examples/A2-redpanda/`](examples/A2-redpanda/README.md) | `kongctl apply -f examples/A2-redpanda/kongctl/config.yaml` | Redpanda |
 
 ## Testing with kafkactl
 
-The `.kafkactl.yml` configuration includes three contexts:
-- `default`: Direct connection to Kafka (localhost:9092)
-- `virtual`: Connection through basic proxy (localhost:19092)
-- `secured`: Connection through authenticated proxy (localhost:29092)
+| Context | Port | Auth | Notes |
+|---------|------|------|-------|
+| `default` | 9092 | None | Direct to Kafka |
+| `core-proxy` | 19092 | Anonymous | Flat passthrough VC |
+| `team-a` | 19192 | Anonymous | Team A namespace |
+| `team-b` | 19292 | Anonymous | Team B (unauthenticated) |
+| `team-b-authed` | 19292 | SASL/PLAIN | Team B (team-b-user/secret) |
+| `team-b-authed` | 19292 | SASL/PLAIN | Team B (authenticated with ACLs) |
 
-Switch contexts using:
 ```bash
-kafkactl config use-context [context-name]
+kafkactl config use-context core-proxy
+kafkactl get topics
 ```
-
-## Components
-
-The main docker-compose file includes:
-- Apache Kafka
-- Schema Registry
-- Kong Event Gateway (Kiburi)
-- Kafka UI (available at http://localhost:8080)
 
 ## Environment Variables
 
-Required environment variables for Kong Event Gateway:
-- `KONNECT_CP_HOST`: Konnect Control Plane host
-- `KONNECT_PAT`: Personal Access Token
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `KONG_KONNECT_REGION` | Yes | Konnect region (us, eu, au) |
+| `KONG_KONNECT_DOMAIN` | Yes | Konnect domain (konghq.com) |
+| `KONG_KONNECT_GATEWAY_CLUSTER_ID` | Yes | Gateway cluster ID from Konnect |
+| `KONG_KONNECT_CLIENT_CERT` | Yes | Data plane TLS certificate (PEM) |
+| `KONG_KONNECT_CLIENT_KEY` | Yes | Data plane TLS private key (PEM) |
+| `KAFKA_USERNAME` | Variant | Confluent Cloud username |
+| `KAFKA_PASSWORD` | Variant | Confluent Cloud password |
+| `TRANSACTION_ENCRYPTION_KEY` | Examples 6-7 | Base64-encoded 32-byte encryption key |
 
-## Common Use Cases
+## Directory Structure
 
-1. Development and Testing
-   - Use the Basic Proxy example
-   - Anonymous authentication
-   - Direct pass-through functionality
-
-2. Multi-tenant Environments
-   - Topic Filter example for namespace isolation
-   - Authentication Mediation for security
-   - Schema Validation for data governance
-
-3. Security Implementation
-   - Authentication Mediation for access control
-   - Encryption for data protection
-   - Multiple authentication methods
-
-4. Data Quality
-   - Schema Validation for message format enforcement
-   - Topic Filter for organizational standards
-   - Error handling and validation
-
-5. Cloud Integration
-   - Confluent Cloud integration for managed Kafka
-   - Secure credential management
-   - TLS and SASL authentication
-
-## Troubleshooting
-
-Common issues across examples:
-
-1. Connection Issues
-   - Verify services are running (`docker ps`)
-   - Check port availability
-   - Confirm environment variables are set
-
-2. Authentication Problems
-   - Verify correct context in kafkactl
-   - Check JWT token validity
-   - Confirm proxy port usage
-
-3. Configuration
-   - Validate config.yaml syntax
-   - Check service dependencies
-   - Verify network connectivity
+```
+kong-event-gw-examples/
+├── docker-compose.yaml              # Gateway data plane
+├── kafka/
+│   ├── docker-compose.yaml          # Kafka cluster + Apicurio
+│   └── config/
+│       ├── topics.txt
+│       └── schemas/
+├── kongctl/
+│   ├── certs/                       # TLS identity (gitignored)
+│   └── data_plane_certificate.yaml  # Register gateway in Konnect
+├── examples/
+│   ├── 01-basic-proxy/
+│   │   ├── kongctl/config.yaml      # Phase 1 config
+│   │   └── README.md
+│   ├── 02-topic-alias/
+│   │   └── README.md                # CEL concept reference
+│   ├── 03-topic-filter/
+│   │   ├── kongctl/config.yaml      # Phase 2 config
+│   │   └── README.md
+│   ├── 04-auth-mediation/
+│   │   ├── kongctl/config.yaml      # Phase 3 config
+│   │   └── README.md
+│   ├── 05-acl-enforcement/
+│   │   ├── kongctl/config.yaml      # Phase 5 config
+│   │   └── README.md
+│   ├── 06-encryption/
+│   │   ├── kongctl/config.yaml      # Phase 6 config
+│   │   └── README.md
+│   ├── 07-schema-validation/
+│   │   ├── kongctl/config.yaml      # Phase 7 config
+│   │   └── README.md
+│   ├── A1-confluent-cloud/
+│   │   ├── kongctl/config.yaml      # Confluent variant
+│   │   └── README.md
+│   └── A2-redpanda/
+│       ├── kongctl/config.yaml      # Redpanda variant
+│       └── README.md
+├── konnect.env.example
+├── .kafkactl.yml
+└── README.md
+```
 
 ## License
 

@@ -1,0 +1,84 @@
+# ============================================================
+# Phase 1 — Basic Proxy
+#
+# What this does:
+#   Registers a local Kafka cluster with the Event Gateway and
+#   exposes it via a single flat passthrough virtual cluster.
+#   No namespaces, no auth, no policies — just the gateway in
+#   front of Kafka as a transparent proxy.
+#
+# Based on: examples/01-basic-proxy
+#
+# Apply:
+#   kongctl apply -f kongctl/phase-1-basic-proxy.yaml
+# ============================================================
+
+_defaults:
+  kongctl:
+    namespace: keg-examples
+
+event_gateways:
+  - ref: keg-examples-gateway
+    name: keg-examples-gateway
+    description: Kong Event Gateway Examples — local Kafka cluster
+    labels:
+      env: example
+      project: keg-examples
+
+    backend_clusters:
+      - ref: local-kafka
+        name: local-kafka
+        description: 3-broker KRaft Kafka cluster running in Docker
+        labels:
+          env: example
+          role: message-broker
+          tier: backend
+        authentication:
+          type: anonymous
+        bootstrap_servers:
+          - kafka1:9092
+          - kafka2:9092
+          - kafka3:9092
+        tls:
+          enabled: false
+        insecure_allow_anonymous_virtual_cluster_auth: true
+
+    listeners:
+      - ref: core-listener
+        name: core-listener
+        labels:
+          env: example
+          role: ingress
+        addresses:
+          - "0.0.0.0"
+        ports:
+          - "19092-19190"
+        policies:
+          - ref: forward-to-core-proxy
+            type: forward_to_virtual_cluster
+            name: forward-to-core-proxy
+            labels:
+              env: example
+              role: routing
+            config:
+              type: port_mapping
+              destination:
+                id: !ref core-proxy
+              advertised_host: localhost
+              bootstrap_port: none
+              min_broker_id: 0
+
+    virtual_clusters:
+      - ref: core-proxy
+        name: core-proxy
+        description: Flat passthrough virtual cluster. Exposes all backend topics without transformation.
+        labels:
+          env: example
+          role: virtual-cluster
+          tier: core
+        destination:
+          id: !ref local-kafka
+        acl_mode: passthrough
+        dns_label: core-proxy
+        authentication:
+          - type: anonymous

@@ -1,0 +1,172 @@
+# ============================================================
+# Phase 2 — Topic Filter (Namespace Isolation)
+#
+# What this adds (on top of phase-1):
+#   - Two virtual clusters with namespace prefix isolation
+#   - team-a: prefix "A.", accessible on ports 19192-19290
+#   - team-b: prefix "B.", accessible on ports 19292-19390
+#   - Shared topics injected into both views
+#   - Auth still anonymous; ACLs still passthrough
+#
+# Based on: examples/03-topic-filter
+#
+# Apply:
+#   kongctl apply -f kongctl/phase-2-topic-filter.yaml
+# ============================================================
+
+_defaults:
+  kongctl:
+    namespace: keg-examples
+
+event_gateways:
+  - ref: keg-examples-gateway
+    name: keg-examples-gateway
+    description: Kong Event Gateway Examples — local Kafka cluster
+    labels:
+      env: example
+      project: keg-examples
+
+    backend_clusters:
+      - ref: local-kafka
+        name: local-kafka
+        labels:
+          env: example
+          role: message-broker
+          tier: backend
+        authentication:
+          type: anonymous
+        bootstrap_servers:
+          - kafka1:9092
+          - kafka2:9092
+          - kafka3:9092
+        tls:
+          enabled: false
+        insecure_allow_anonymous_virtual_cluster_auth: true
+
+    listeners:
+      - ref: core-listener
+        name: core-listener
+        labels:
+          env: example
+          role: ingress
+        addresses: ["0.0.0.0"]
+        ports: ["19092-19190"]
+        policies:
+          - ref: forward-to-core-proxy
+            type: forward_to_virtual_cluster
+            name: forward-to-core-proxy
+            labels:
+              env: example
+              role: routing
+            config:
+              type: port_mapping
+              destination:
+                id: !ref core-proxy
+              advertised_host: localhost
+              bootstrap_port: none
+              min_broker_id: 0
+
+      - ref: team-a-listener
+        name: team-a-listener
+        labels:
+          env: example
+          role: ingress
+          team: team-a
+        addresses: ["0.0.0.0"]
+        ports: ["19192-19290"]
+        policies:
+          - ref: forward-to-team-a
+            type: forward_to_virtual_cluster
+            name: forward-to-team-a
+            labels:
+              env: example
+              role: routing
+              team: team-a
+            config:
+              type: port_mapping
+              destination:
+                id: !ref team-a
+              advertised_host: localhost
+              bootstrap_port: none
+              min_broker_id: 0
+
+      - ref: team-b-listener
+        name: team-b-listener
+        labels:
+          env: example
+          role: ingress
+          team: team-b
+        addresses: ["0.0.0.0"]
+        ports: ["19292-19390"]
+        policies:
+          - ref: forward-to-team-b
+            type: forward_to_virtual_cluster
+            name: forward-to-team-b
+            labels:
+              env: example
+              role: routing
+              team: team-b
+            config:
+              type: port_mapping
+              destination:
+                id: !ref team-b
+              advertised_host: localhost
+              bootstrap_port: none
+              min_broker_id: 0
+
+    virtual_clusters:
+      - ref: team-a
+        name: team-a
+        description: Team A — namespace isolated with prefix "A."
+        labels:
+          env: example
+          role: virtual-cluster
+          team: team-a
+        destination:
+          id: !ref local-kafka
+        acl_mode: passthrough
+        dns_label: team-a
+        namespace:
+          mode: hide_prefix
+          prefix: "A."
+          additional:
+            topics:
+              - type: glob
+                glob: "nw.*"
+        authentication:
+          - type: anonymous
+
+      - ref: team-b
+        name: team-b
+        description: Team B — namespace isolated with prefix "B."
+        labels:
+          env: example
+          role: virtual-cluster
+          team: team-b
+        destination:
+          id: !ref local-kafka
+        acl_mode: passthrough
+        dns_label: team-b
+        namespace:
+          mode: hide_prefix
+          prefix: "B."
+          additional:
+            topics:
+              - type: glob
+                glob: "nw.*"
+        authentication:
+          - type: anonymous
+
+      - ref: core-proxy
+        name: core-proxy
+        description: Flat passthrough virtual cluster — all topics visible.
+        labels:
+          env: example
+          role: virtual-cluster
+          tier: core
+        destination:
+          id: !ref local-kafka
+        acl_mode: passthrough
+        dns_label: core-proxy
+        authentication:
+          - type: anonymous

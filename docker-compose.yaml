@@ -1,0 +1,22 @@
+name: keg_data_plane
+
+networks:
+  keg:
+    name: keg-network
+    external: true
+
+services:
+  keg-data-plane:
+    image: kong/kong-event-gateway:latest
+    container_name: keg-data-plane
+    restart: unless-stopped
+    env_file:
+      - konnect.env
+    environment:
+      KEG__OBSERVABILITY__LOG_FLAGS: info,keg=debug
+    volumes:
+      - ./kongctl/certs:/etc/keg/certs:ro
+    ports:
+      - "19092-19389:19092-19389"
+    networks:
+      - keg

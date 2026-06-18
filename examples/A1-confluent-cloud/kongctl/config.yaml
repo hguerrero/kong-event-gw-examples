@@ -1,0 +1,77 @@
+# ============================================================
+# Variant — Confluent Cloud Backend
+#
+# This is an ALTERNATIVE configuration that replaces the
+# local Kafka cluster with a Confluent Cloud cluster.
+# Apply this INSTEAD of the phase files to use Confluent Cloud
+# as the backend.
+#
+# Features:
+#   - SASL/PLAIN authentication to Confluent Cloud
+#   - TLS encryption
+#   - SNI-based routing
+#   - Anonymous mediation (credentials stay at the gateway)
+#
+# Based on: examples/A1-confluent-cloud
+#
+# Required:
+#   - Update bootstrap_servers with your Confluent Cloud endpoint
+#   - Set KAFKA_USERNAME and KAFKA_PASSWORD environment variables
+#
+# Apply:
+#   kongctl apply -f kongctl/variant-confluent-cloud.yaml
+# ============================================================
+
+_defaults:
+  kongctl:
+    namespace: keg-examples
+
+event_gateways:
+  - ref: keg-examples-gateway
+    name: KEG Examples Gateway
+    description: Confluent Cloud backend
+
+    backend_clusters:
+      - ref: confluent-cloud
+        name: Confluent Cloud
+        authentication:
+          type: sasl_plain
+          sasl_plain:
+            username: !env KAFKA_USERNAME
+            password: !env KAFKA_PASSWORD
+        bootstrap_servers:
+          - <replace-with-your-bootstrap-server>:9092
+        tls:
+          enabled: true
+          insecure_skip_verify: true
+
+    listeners:
+      - ref: confluent-listener
+        name: confluent-listener
+        addresses:
+          - "0.0.0.0"
+        ports:
+          - "9092"
+        policies:
+          - ref: forward-to-confluent-vc
+            type: forward_to_virtual_cluster
+            name: forward-to-confluent-vc
+            config:
+              type: port_mapping
+              destination:
+                id: !ref confluent-proxy
+              advertised_host: localhost
+              bootstrap_port: none
+              min_broker_id: 0
+
+    virtual_clusters:
+      - ref: confluent-proxy
+        name: confluent-proxy
+        description: Virtual cluster forwarding to Confluent Cloud with anonymous client access
+        destination:
+          id: !ref confluent-cloud
+        acl_mode: passthrough
+        dns_label: confluent-proxy
+        authentication:
+          - type: anonymous
+            mediation: use_backend_cluster

@@ -1,0 +1,135 @@
+# ============================================================
+# Phase 3 — Auth Mediation
+#
+# What this adds (on top of phase-2):
+#   - SASL/PLAIN authentication for Team B
+#   - mediation: terminate — credentials stop at the gateway;
+#     Kafka never sees them
+#   - Team A stays anonymous
+#
+# Based on: examples/04-auth-mediation
+#
+# Apply:
+#   kongctl apply -f kongctl/phase-3-auth-mediation.yaml
+# ============================================================
+
+_defaults:
+  kongctl:
+    namespace: keg-examples
+
+event_gateways:
+  - ref: keg-examples-gateway
+    name: KEG Examples Gateway
+    description: Kong Event Gateway Examples — local Kafka cluster
+
+    backend_clusters:
+      - ref: local-kafka
+        name: Local Kafka Cluster
+        authentication:
+          type: anonymous
+        bootstrap_servers:
+          - kafka1:9092
+          - kafka2:9092
+          - kafka3:9092
+        tls:
+          enabled: false
+        insecure_allow_anonymous_virtual_cluster_auth: true
+
+    listeners:
+      - ref: core-listener
+        name: core-listener
+        addresses: ["0.0.0.0"]
+        ports: ["19092-19190"]
+        policies:
+          - ref: forward-to-core-proxy
+            type: forward_to_virtual_cluster
+            name: forward-to-core-proxy
+            config:
+              type: port_mapping
+              destination:
+                id: !ref core-proxy
+              advertised_host: localhost
+              bootstrap_port: none
+              min_broker_id: 0
+
+      - ref: team-a-listener
+        name: team-a-listener
+        addresses: ["0.0.0.0"]
+        ports: ["19192-19290"]
+        policies:
+          - ref: forward-to-team-a
+            type: forward_to_virtual_cluster
+            name: forward-to-team-a
+            config:
+              type: port_mapping
+              destination:
+                id: !ref team-a
+              advertised_host: localhost
+              bootstrap_port: none
+              min_broker_id: 0
+
+      - ref: team-b-listener
+        name: team-b-listener
+        addresses: ["0.0.0.0"]
+        ports: ["19292-19390"]
+        policies:
+          - ref: forward-to-team-b
+            type: forward_to_virtual_cluster
+            name: forward-to-team-b
+            config:
+              type: port_mapping
+              destination:
+                id: !ref team-b
+              advertised_host: localhost
+              bootstrap_port: none
+              min_broker_id: 0
+
+    virtual_clusters:
+      - ref: team-a
+        name: team-a
+        description: Team A — anonymous access
+        destination:
+          id: !ref local-kafka
+        acl_mode: passthrough
+        dns_label: team-a
+        namespace:
+          mode: hide_prefix
+          prefix: "A."
+          additional:
+            topics:
+              - type: glob
+                glob: "nw.*"
+        authentication:
+          - type: anonymous
+
+      - ref: team-b
+        name: team-b
+        description: Team B — SASL/PLAIN authentication terminated at gateway
+        destination:
+          id: !ref local-kafka
+        acl_mode: passthrough
+        dns_label: team-b
+        namespace:
+          mode: hide_prefix
+          prefix: "B."
+          additional:
+            topics:
+              - type: glob
+                glob: "nw.*"
+        authentication:
+          - type: anonymous
+          - type: sasl_plain
+            mediation: terminate
+            principals:
+              - username: team-b-user
+                password: secret
+
+      - ref: core-proxy
+        name: core-proxy
+        description: Flat passthrough virtual cluster — all topics visible.
+        destination:
+          id: !ref local-kafka
+        acl_mode: passthrough
+        dns_label: core-proxy
+        authentication:
+          - type: anonymous

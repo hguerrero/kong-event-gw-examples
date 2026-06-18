@@ -1,0 +1,67 @@
+# ============================================================
+# Variant — Redpanda Backend
+#
+# This is an ALTERNATIVE configuration that replaces the
+# local Kafka cluster with a Redpanda cluster.
+# Apply this INSTEAD of the phase files to use Redpanda
+# as the backend.
+#
+# Features:
+#   - Anonymous authentication to Redpanda
+#   - Port-based routing
+#   - Flat passthrough virtual cluster
+#
+# Based on: examples/A2-redpanda
+#
+# Apply:
+#   kongctl apply -f kongctl/variant-redpanda.yaml
+# ============================================================
+
+_defaults:
+  kongctl:
+    namespace: keg-examples
+
+event_gateways:
+  - ref: keg-examples-gateway
+    name: KEG Examples Gateway
+    description: Redpanda backend
+
+    backend_clusters:
+      - ref: redpanda-local
+        name: Redpanda Local
+        authentication:
+          type: anonymous
+        bootstrap_servers:
+          - redpanda-0:9092
+        tls:
+          enabled: false
+
+    listeners:
+      - ref: redpanda-listener
+        name: redpanda-listener
+        addresses:
+          - "0.0.0.0"
+        ports:
+          - "9192-9290"
+        policies:
+          - ref: forward-to-redpanda-vc
+            type: forward_to_virtual_cluster
+            name: forward-to-redpanda-vc
+            config:
+              type: port_mapping
+              destination:
+                id: !ref redpanda-proxy
+              advertised_host: localhost
+              bootstrap_port: none
+              min_broker_id: 0
+
+    virtual_clusters:
+      - ref: redpanda-proxy
+        name: redpanda-proxy
+        description: Flat passthrough virtual cluster for Redpanda
+        destination:
+          id: !ref redpanda-local
+        acl_mode: passthrough
+        dns_label: redpanda-proxy
+        authentication:
+          - type: anonymous

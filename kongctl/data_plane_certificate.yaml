@@ -1,0 +1,24 @@
+# ============================================================================
+# Data Plane Certificate
+#
+# NOTE: Generate the certificate before applying.
+#
+#   openssl req -new -x509 -nodes -newkey rsa:2048 \
+#     -subj "/CN=event-gateway/C=US" \
+#     -keyout kongctl/certs/key.crt \
+#     -out    kongctl/certs/tls.crt
+#
+# The private key (key.crt) stays local — only tls.crt is uploaded to Konnect.
+# ============================================================================
+
+_defaults:
+  kongctl:
+    namespace: keg-examples
+
+event_gateways:
+  - ref: keg-examples-gateway
+    name: keg-examples-gateway
+    data_plane_certificates:
+      - ref: keg-data-plane-cert
+        name: KEG Data Plane Certificate
+        certificate: !file ./certs/tls.crt

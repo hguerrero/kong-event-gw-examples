@@ -1,0 +1,52 @@
+{
+  "type": "record",
+  "namespace": "com.northwind.financial.ledger",
+  "name": "HighValueWireTransfer",
+  "doc": "Avro schema for high-value wire transfer events in the Northwind Financial demo.",
+  "fields": [
+    {
+      "name": "transaction_id",
+      "type": "string"
+    },
+    {
+      "name": "customer_id",
+      "type": "string"
+    },
+    {
+      "name": "account_number",
+      "type": "string"
+    },
+    {
+      "name": "full_name",
+      "type": "string"
+    },
+    {
+      "name": "type",
+      "type": {
+        "type": "enum",
+        "name": "TradeType",
+        "symbols": [
+          "buy",
+          "sell"
+        ]
+      }
+    },
+    {
+      "name": "instrument",
+      "type": "string"
+    },
+    {
+      "name": "quantity",
+      "type": "int"
+    },
+    {
+      "name": "price_usd",
+      "type": "double"
+    },
+    {
+      "name": "settled_at",
+      "type": "string",
+      "doc": "Settlement timestamp in ISO-8601 UTC format."
+    }
+  ]
+}

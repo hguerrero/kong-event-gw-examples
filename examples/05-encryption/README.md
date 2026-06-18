@@ -2,116 +2,95 @@
 
 This example demonstrates how to configure Kong Event Gateway for automatic message encryption and decryption using symmetric key encryption.
 
-## Overview
+> **Note:** This example uses a kongctl configuration at
+> [`kongctl/config.yaml`](kongctl/config.yaml).
 
-The setup provides:
-- Automatic encryption of messages during production
-- Automatic decryption of messages during consumption
-- Symmetric key encryption using a 128-bit key
-- Transparent encryption/decryption (clients don't need to handle encryption)
+## What It Does
 
-## Components
+- Automatic encryption of message values during produce
+- Automatic decryption of message values during consume
+- Static encryption key loaded from environment variable
+- Transparent encryption/decryption — clients don't handle crypto
+- No changes required to producers or consumers
 
-- Kafka broker (localhost:9092)
-- Kong Event Gateway with encryption configuration (localhost:19092)
-- Key generation utilities
+## How to Use
 
-## Quick Start
-
-1. Generate an encryption key:
 ```bash
-./generate_key.sh
-```
+# Generate an encryption key:
+export TRANSACTION_ENCRYPTION_KEY=$(openssl rand -base64 32)
 
-2. Update the `config.yaml` file with your generated key:
-```yaml
-key_sources:
-  - type: static
-    name: inline-key
-    static:
-      - id: "static://key-0"
-        key:
-          type: bytes
-          bytes:
-            value: "YOUR_GENERATED_KEY"
-```
+# Apply the phase configuration:
+kongctl apply -f kongctl/config.yaml
 
-3. Start the services:
-```bash
-docker-compose up -d
-```
+# Test producing through the gateway (encrypted):
+kafkactl config use-context core-proxy
+kafkactl produce nw.ledger.transactions.high-value-wire-transfers.v1 \
+  --value='{"transaction_id":"tx-001","amount":500000}'
 
-## Testing
+# Consume through the gateway (decrypted):
+kafkactl consume nw.ledger.transactions.high-value-wire-transfers.v1 \
+  --from-beginning --exit
 
-Using kafkactl, you can test the encryption:
-
-1. Produce a message through the proxy (will be encrypted):
-```bash
-echo "secret message" | kafkactl -c virtual produce my-topic
-```
-
-2. Consume through the proxy (will be decrypted):
-```bash
-kafkactl -c virtual consume my-topic
-```
-
-3. Consume directly from Kafka (will be encrypted):
-```bash
-kafkactl -c default consume my-topic
+# Consume directly from Kafka (encrypted — unreadable):
+kafkactl config use-context default
+kafkactl consume nw.ledger.transactions.high-value-wire-transfers.v1 \
+  --from-beginning --exit --print-headers
 ```
 
 ## Configuration Details
 
-The configuration includes:
+The phase-4 configuration adds:
 
-- Produce policies that encrypt all message values
-- Consume policies that decrypt all message values
-- Error handling for encryption/decryption failures
-- Static key configuration for simplicity
+```yaml
+static_keys:
+  - ref: transaction-encryption-key
+    value: !env TRANSACTION_ENCRYPTION_KEY
 
-## Security Considerations
+virtual_clusters:
+  - ref: core-proxy
+    produce_policies:
+      - ref: wire-transfer-encryption-policy
+        type: encrypt
+        condition: 'context.topic.name == "nw.ledger.transactions.high-value-wire-transfers.v1"'
+        config:
+          part_of_record:
+            - value
+          encryption_key:
+            type: static
+            key:
+              id: !ref transaction-encryption-key
 
-- The encryption key is stored in plain text in the configuration file
-- In production environments, use secure key management solutions
-- The example uses network_mode: host for simplicity; adjust for production
-- Messages are encrypted at rest in Kafka
-- Only consumers through the proxy can decrypt messages
-
-## Troubleshooting
-
-Common issues:
-
-1. Encryption failures:
-   - Verify the key is correctly base64 encoded
-   - Ensure the key is exactly 16 bytes (128 bits) before base64 encoding
-
-2. Decryption failures:
-   - Confirm the same key is used in both produce and consume policies
-   - Verify messages were produced through the proxy
-
-## Directory Structure
-
-```
-04-encryption/
-├── config.yaml           # Gateway configuration with encryption
-├── docker-compose.yaml   # Service definitions
-├── generate_key.sh       # Key generation utility
-└── README.md            # This file
+    consume_policies:
+      - ref: wire-transfer-decryption-policy
+        type: decrypt
+        condition: 'context.topic.name == "nw.ledger.transactions.high-value-wire-transfers.v1"'
+        config:
+          part_of_record:
+            - value
+          key_sources:
+            - type: static
+              key:
+                id: !ref transaction-encryption-key
 ```
 
-## Related Documentation
+### Key Concepts
 
+- **Static Key**: A fixed encryption key stored in the gateway configuration, loaded from environment
+- **Produce Policy**: Applied to messages being produced — can encrypt, validate schema, etc.
+- **Consume Policy**: Applied to messages being consumed — can decrypt, transform, etc.
+- **failure_mode: error**: If encryption/decryption fails, the operation is rejected
+
+## Lifecycle
+
+Phase 4 builds on Phase 3. To move to Phase 5 (schema validation):
+
+```bash
+export TRANSACTION_ENCRYPTION_KEY=$(openssl rand -base64 32)
+kongctl apply -f ../06-schema-validation/kongctl/config.yaml
+```
+
+## See Also
+
+- [Auth Mediation](../04-auth-mediation/kongctl/config.yaml)
+- [Schema Validation](../06-schema-validation/kongctl/config.yaml)
 - [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)
-- [Message Encryption Documentation](https://docs.konghq.com/gateway/latest/kong-event-gateway/)
-
-## Environment Variables
-
-Required environment variables:
-- `KONNECT_CP_HOST`: Konnect Control Plane host
-- `KONNECT_PAT`: Personal Access Token
-
-## Limitations
-
-- Only message values are encrypted (not keys or headers)
-- Single encryption key for all messages
-- Symmetric encryption only

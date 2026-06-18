@@ -1,0 +1,155 @@
+name: kafka_cluster
+
+networks:
+  kafka:
+    name: keg-network
+    external: true
+
+services:
+  kafka1:
+    image: apache/kafka:4.1.1
+    networks:
+      - kafka
+    # container_name: kafka1
+    hostname: kafka1
+    # ports:
+    #   - "9092:9094"
+    environment:
+      KAFKA_NODE_ID: 0
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: INTERNAL://kafka1:9092,CONTROLLER://kafka1:9093,EXTERNAL://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka1:9092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 0@kafka1:9093,1@kafka2:9093,2@kafka3:9093
+      KAFKA_CLUSTER_ID: 'abcdefghijklmnopqrstuv'
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+
+  kafka2:
+    image: apache/kafka:4.1.1
+    networks:
+      - kafka
+    # container_name: kafka2
+    hostname: kafka2
+    # ports:
+    #   - "9093:9095"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: INTERNAL://kafka2:9092,CONTROLLER://kafka2:9093,EXTERNAL://0.0.0.0:9095
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka2:9092,EXTERNAL://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 0@kafka1:9093,1@kafka2:9093,2@kafka3:9093
+      KAFKA_CLUSTER_ID: 'abcdefghijklmnopqrstuv'
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+
+  kafka3:
+    image: apache/kafka:4.1.1
+    networks:
+      - kafka
+    # container_name: kafka3
+    hostname: kafka3
+    # ports:
+    #   - "9094:9096"
+    environment:
+      KAFKA_NODE_ID: 2
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: INTERNAL://kafka3:9092,CONTROLLER://kafka3:9093,EXTERNAL://0.0.0.0:9096
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka3:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 0@kafka1:9093,1@kafka2:9093,2@kafka3:9093
+      KAFKA_CLUSTER_ID: 'abcdefghijklmnopqrstuv'
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+
+  apicurio-registry:
+    image: apicurio/apicurio-registry:3.1.7
+    container_name: apicurio-registry
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - kafka
+
+  apicurio-registry-ui:
+    image: apicurio/apicurio-registry-ui:3.1.7
+    container_name: apicurio-registry-ui
+    restart: unless-stopped
+    depends_on:
+      - apicurio-registry
+    # environment:
+    #   REGISTRY_API_URL: http://apicurio-registry:8080/apis/registry/v3
+    ports:
+      - "8888:8080"
+    networks:
+      - kafka
+
+  register-schema:
+    image: curlimages/curl:8.8.0
+    container_name: register-schema
+    profiles:
+      - init
+    restart: "no"
+    depends_on:
+      - apicurio-registry
+    volumes:
+      - ./config/schemas:/schemas:ro
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        echo "Waiting for Apicurio Registry to be ready..."
+        for i in $$(seq 1 30); do
+          if curl -s -o /dev/null -w "%{http_code}" http://apicurio-registry:8080/apis/ccompat/v7/subjects | grep -q "200"; then
+            echo "Apicurio Registry (Confluent compat) is ready."
+            break
+          fi
+          echo "Attempt $$i/30 - Registry not ready yet, waiting 5s..."
+          sleep 5
+        done
+
+        SCHEMA_JSON=$$(cat /schemas/high_value_wire_transfers.avsc | tr -d '\n' | sed 's/"/\\"/g')
+        echo "Registering Avro schema via Confluent-compatible API..."
+        curl -sS -X POST \
+          -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+          --data "{\"schema\":\"$${SCHEMA_JSON}\",\"schemaType\":\"AVRO\"}" \
+          http://apicurio-registry:8080/apis/ccompat/v7/subjects/nw.ledger.transactions.high-value-wire-transfers.v1-value/versions
+
+        echo ""
+        echo "Schema registration complete."
+    networks:
+      - kafka
+
+  create-topics:
+    image: deviceinsight/kafkactl:latest
+    container_name: create-topics
+    profiles:
+      - init
+    restart: "no"
+    environment:
+      BROKERS: kafka1:9092
+    volumes:
+      - ./config/topics.txt:/config/topics.txt:ro
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        echo "Creating Kafka topics from config/topics.txt..."
+        while IFS= read -r topic || [ -n "$$topic" ]; do
+          [ -z "$$topic" ] && continue
+          echo "  -> Creating topic: $$topic"
+          if kafkactl describe topic "$$topic" >/dev/null 2>&1; then
+            echo "     Topic already exists, skipping."
+          else
+            kafkactl create topic "$$topic" \
+              --partitions 3 \
+              --replication-factor 3
+          fi
+        done < /config/topics.txt
+        echo "Topic creation complete."
+    networks:
+      - kafka

@@ -134,7 +134,7 @@ Adds SASL/PLAIN authentication to Team B with `mediation: terminate`.
 kongctl apply -f examples/05-acl-enforcement/kongctl/config.yaml
 ```
 
-Switches Team B from passthrough to `enforce_on_gateway` ACL mode with explicit allow rules. Unauthenticated requests to Team B are now rejected.
+Switches Team B from passthrough to `enforce_on_gateway` ACL mode with two-tier rules: read-only for anonymous, full access for authenticated users.
 
 ### [5 — Message Encryption](examples/06-encryption/README.md)
 
@@ -170,9 +170,9 @@ These replace the local Kafka backend entirely (apply instead of the phases abov
 | `default` | 9092 | None | Direct to Kafka |
 | `core-proxy` | 19092 | Anonymous | Flat passthrough VC |
 | `team-a` | 19192 | Anonymous | Team A namespace |
-| `team-b` | 19292 | Anonymous | Team B (unauthenticated) |
-| `team-b-authed` | 19292 | SASL/PLAIN | Team B (team-b-user/secret) |
-| `team-b-authed` | 19292 | SASL/PLAIN | Team B (authenticated with ACLs) |
+| `team-b` | 19292 | Anonymous | Team B (read-only via ACLs) |
+| `team-b-authed` | 19292 | SASL/PLAIN | Team B (team-b-user/secret, full access) |
+| `team-b-schema` | 19292 | SASL/PLAIN + SR | Team B with Schema Registry |
 
 ```bash
 kafkactl config use-context core-proxy
@@ -218,13 +218,13 @@ kong-event-gw-examples/
 │   │   ├── kongctl/config.yaml      # Phase 3 config
 │   │   └── README.md
 │   ├── 05-acl-enforcement/
-│   │   ├── kongctl/config.yaml      # Phase 5 config
+│   │   ├── kongctl/config.yaml      # Phase 4 config
 │   │   └── README.md
 │   ├── 06-encryption/
-│   │   ├── kongctl/config.yaml      # Phase 6 config
+│   │   ├── kongctl/config.yaml      # Phase 5 config
 │   │   └── README.md
 │   ├── 07-schema-validation/
-│   │   ├── kongctl/config.yaml      # Phase 7 config
+│   │   ├── kongctl/config.yaml      # Phase 6 config
 │   │   └── README.md
 │   ├── A1-confluent-cloud/
 │   │   ├── kongctl/config.yaml      # Confluent variant

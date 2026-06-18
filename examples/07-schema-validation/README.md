@@ -10,12 +10,12 @@ This example demonstrates how to configure Kong Event Gateway to enforce schema 
 - Registers Apicurio Schema Registry (Confluent-compatible mode) in the gateway
 - Enforces JSON schema validation on fraud risk score topics
 - Rejects non-conformant produce requests before they reach the broker
-- Enables ACL enforcement on Team B for fine-grained access control
+- ACL enforcement on Team B carried forward from Phase 5 (read-only for anonymous, full access for team-b-user)
 
 ## How to Use
 
 ```bash
-# Ensure encryption key is set (carried over from Phase 4):
+# Ensure encryption key is set (carried over from Phase 6):
 export TRANSACTION_ENCRYPTION_KEY=$(openssl rand -base64 32)
 
 # Apply the phase configuration:
@@ -33,7 +33,7 @@ kafkactl produce B.infosec.security.fraud.risk-scores.v3 \
 
 ## Configuration Details
 
-The phase-5 configuration adds schema validation to Team B:
+The phase-7 configuration adds schema validation to Team B:
 
 ```yaml
 schema_registries:
@@ -81,7 +81,8 @@ kafkactl produce B.infosec.security.fraud.risk-scores.v3 \
 
 ## See Also
 
-- [Encryption](../05-encryption/kongctl/config.yaml)
+- [Encryption](../06-encryption/kongctl/config.yaml)
+- [ACL Enforcement](../05-acl-enforcement/kongctl/config.yaml)
 - [Kafka schema definitions](../../kafka/config/schemas/)
 - [Apicurio Registry Documentation](https://www.apicur.io/registry/)
 - [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)

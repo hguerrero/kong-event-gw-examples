@@ -28,12 +28,20 @@ _defaults:
 
 event_gateways:
   - ref: keg-examples-gateway
-    name: KEG Examples Gateway
+    name: keg-examples-gateway
     description: Confluent Cloud backend
+    labels:
+      env: example
+      project: keg-examples
 
     backend_clusters:
       - ref: confluent-cloud
-        name: Confluent Cloud
+        name: confluent-cloud
+        labels:
+          env: example
+          role: message-broker
+          tier: backend
+          provider: confluent-cloud
         authentication:
           type: sasl_plain
           sasl_plain:
@@ -48,6 +56,9 @@ event_gateways:
     listeners:
       - ref: confluent-listener
         name: confluent-listener
+        labels:
+          env: example
+          role: ingress
         addresses:
           - "0.0.0.0"
         ports:
@@ -56,6 +67,9 @@ event_gateways:
           - ref: forward-to-confluent-vc
             type: forward_to_virtual_cluster
             name: forward-to-confluent-vc
+            labels:
+              env: example
+              role: routing
             config:
               type: port_mapping
               destination:
@@ -68,6 +82,11 @@ event_gateways:
       - ref: confluent-proxy
         name: confluent-proxy
         description: Virtual cluster forwarding to Confluent Cloud with anonymous client access
+        labels:
+          env: example
+          role: virtual-cluster
+          tier: core
+          provider: confluent-cloud
         destination:
           id: !ref confluent-cloud
         acl_mode: passthrough

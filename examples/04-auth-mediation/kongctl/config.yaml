@@ -19,12 +19,19 @@ _defaults:
 
 event_gateways:
   - ref: keg-examples-gateway
-    name: KEG Examples Gateway
+    name: keg-examples-gateway
     description: Kong Event Gateway Examples — local Kafka cluster
+    labels:
+      env: example
+      project: keg-examples
 
     backend_clusters:
       - ref: local-kafka
-        name: Local Kafka Cluster
+        name: local-kafka
+        labels:
+          env: example
+          role: message-broker
+          tier: backend
         authentication:
           type: anonymous
         bootstrap_servers:
@@ -38,12 +45,18 @@ event_gateways:
     listeners:
       - ref: core-listener
         name: core-listener
+        labels:
+          env: example
+          role: ingress
         addresses: ["0.0.0.0"]
         ports: ["19092-19190"]
         policies:
           - ref: forward-to-core-proxy
             type: forward_to_virtual_cluster
             name: forward-to-core-proxy
+            labels:
+              env: example
+              role: routing
             config:
               type: port_mapping
               destination:
@@ -54,12 +67,20 @@ event_gateways:
 
       - ref: team-a-listener
         name: team-a-listener
+        labels:
+          env: example
+          role: ingress
+          team: team-a
         addresses: ["0.0.0.0"]
         ports: ["19192-19290"]
         policies:
           - ref: forward-to-team-a
             type: forward_to_virtual_cluster
             name: forward-to-team-a
+            labels:
+              env: example
+              role: routing
+              team: team-a
             config:
               type: port_mapping
               destination:
@@ -70,12 +91,20 @@ event_gateways:
 
       - ref: team-b-listener
         name: team-b-listener
+        labels:
+          env: example
+          role: ingress
+          team: team-b
         addresses: ["0.0.0.0"]
         ports: ["19292-19390"]
         policies:
           - ref: forward-to-team-b
             type: forward_to_virtual_cluster
             name: forward-to-team-b
+            labels:
+              env: example
+              role: routing
+              team: team-b
             config:
               type: port_mapping
               destination:
@@ -88,6 +117,10 @@ event_gateways:
       - ref: team-a
         name: team-a
         description: Team A — anonymous access
+        labels:
+          env: example
+          role: virtual-cluster
+          team: team-a
         destination:
           id: !ref local-kafka
         acl_mode: passthrough
@@ -105,6 +138,10 @@ event_gateways:
       - ref: team-b
         name: team-b
         description: Team B — SASL/PLAIN authentication terminated at gateway
+        labels:
+          env: example
+          role: virtual-cluster
+          team: team-b
         destination:
           id: !ref local-kafka
         acl_mode: passthrough
@@ -117,7 +154,6 @@ event_gateways:
               - type: glob
                 glob: "nw.*"
         authentication:
-          - type: anonymous
           - type: sasl_plain
             mediation: terminate
             principals:
@@ -127,6 +163,10 @@ event_gateways:
       - ref: core-proxy
         name: core-proxy
         description: Flat passthrough virtual cluster — all topics visible.
+        labels:
+          env: example
+          role: virtual-cluster
+          tier: core
         destination:
           id: !ref local-kafka
         acl_mode: passthrough

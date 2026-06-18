@@ -18,7 +18,13 @@ _defaults:
 event_gateways:
   - ref: keg-examples-gateway
     name: keg-examples-gateway
+    labels:
+      env: example
+      project: keg-examples
     data_plane_certificates:
       - ref: keg-data-plane-cert
-        name: KEG Data Plane Certificate
+        name: keg-data-plane-cert
+        labels:
+          env: example
+          role: data-plane-cert
         certificate: !file ./certs/tls.crt

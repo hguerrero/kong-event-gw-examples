@@ -92,8 +92,9 @@ Apply them in order — each replaces the previous configuration with one that a
 | 1 | [`examples/01-basic-proxy/`](examples/01-basic-proxy/README.md) | `kongctl apply -f examples/01-basic-proxy/kongctl/config.yaml` | Backend cluster + flat passthrough VC | — |
 | 2 | [`examples/03-topic-filter/`](examples/03-topic-filter/README.md) | `kongctl apply -f examples/03-topic-filter/kongctl/config.yaml` | Multi-VC namespace isolation | [`02-topic-alias`](examples/02-topic-alias/README.md) (CEL concept) |
 | 3 | [`examples/04-auth-mediation/`](examples/04-auth-mediation/README.md) | `kongctl apply -f examples/04-auth-mediation/kongctl/config.yaml` | SASL/PLAIN auth termination | — |
-| 4 | [`examples/05-encryption/`](examples/05-encryption/README.md) | `kongctl apply -f examples/05-encryption/kongctl/config.yaml` | Encrypt/decrypt policies | — |
-| 5 | [`examples/06-schema-validation/`](examples/06-schema-validation/README.md) | `kongctl apply -f examples/06-schema-validation/kongctl/config.yaml` | Schema validation + ACLs | — |
+| 4 | [`examples/05-acl-enforcement/`](examples/05-acl-enforcement/README.md) | `kongctl apply -f examples/05-acl-enforcement/kongctl/config.yaml` | ACL enforcement on Team B | — |
+| 5 | [`examples/06-encryption/`](examples/06-encryption/README.md) | `kongctl apply -f examples/06-encryption/kongctl/config.yaml` | Encrypt/decrypt policies | — |
+| 6 | [`examples/07-schema-validation/`](examples/07-schema-validation/README.md) | `kongctl apply -f examples/07-schema-validation/kongctl/config.yaml` | Schema validation + ACLs | — |
 
 ### [1 — Basic Proxy](examples/01-basic-proxy/README.md)
 
@@ -127,23 +128,31 @@ kafkactl get topics
 
 Adds SASL/PLAIN authentication to Team B with `mediation: terminate`.
 
-### [4 — Message Encryption](examples/05-encryption/README.md)
+### [4 — ACL Enforcement](examples/05-acl-enforcement/README.md)
+
+```bash
+kongctl apply -f examples/05-acl-enforcement/kongctl/config.yaml
+```
+
+Switches Team B from passthrough to `enforce_on_gateway` ACL mode with explicit allow rules. Unauthenticated requests to Team B are now rejected.
+
+### [5 — Message Encryption](examples/06-encryption/README.md)
 
 ```bash
 export TRANSACTION_ENCRYPTION_KEY=$(openssl rand -base64 32)
-kongctl apply -f examples/05-encryption/kongctl/config.yaml
+kongctl apply -f examples/06-encryption/kongctl/config.yaml
 ```
 
 Adds field-level encryption for high-value wire transfer events (produce encrypt, consume decrypt).
 
-### [5 — Schema Validation](examples/06-schema-validation/README.md)
+### [6 — Schema Validation](examples/07-schema-validation/README.md)
 
 ```bash
 export TRANSACTION_ENCRYPTION_KEY=$(openssl rand -base64 32)
-kongctl apply -f examples/06-schema-validation/kongctl/config.yaml
+kongctl apply -f examples/07-schema-validation/kongctl/config.yaml
 ```
 
-Adds Apicurio Schema Registry with schema validation on fraud risk score topics, plus ACL enforcement on Team B.
+Adds Apicurio Schema Registry with schema validation on fraud risk score topics.
 
 ## Variants (Alternative Backends)
 
@@ -163,7 +172,7 @@ These replace the local Kafka backend entirely (apply instead of the phases abov
 | `team-a` | 19192 | Anonymous | Team A namespace |
 | `team-b` | 19292 | Anonymous | Team B (unauthenticated) |
 | `team-b-authed` | 19292 | SASL/PLAIN | Team B (team-b-user/secret) |
-| `team-b-schema` | 19292 | SASL/PLAIN + SR | Team B with Schema Registry |
+| `team-b-authed` | 19292 | SASL/PLAIN | Team B (authenticated with ACLs) |
 
 ```bash
 kafkactl config use-context core-proxy
@@ -181,7 +190,7 @@ kafkactl get topics
 | `KONG_KONNECT_CLIENT_KEY` | Yes | Data plane TLS private key (PEM) |
 | `KAFKA_USERNAME` | Variant | Confluent Cloud username |
 | `KAFKA_PASSWORD` | Variant | Confluent Cloud password |
-| `TRANSACTION_ENCRYPTION_KEY` | Examples 4-5 | Base64-encoded 32-byte encryption key |
+| `TRANSACTION_ENCRYPTION_KEY` | Examples 6-7 | Base64-encoded 32-byte encryption key |
 
 ## Directory Structure
 
@@ -208,11 +217,14 @@ kong-event-gw-examples/
 │   ├── 04-auth-mediation/
 │   │   ├── kongctl/config.yaml      # Phase 3 config
 │   │   └── README.md
-│   ├── 05-encryption/
-│   │   ├── kongctl/config.yaml      # Phase 4 config
-│   │   └── README.md
-│   ├── 06-schema-validation/
+│   ├── 05-acl-enforcement/
 │   │   ├── kongctl/config.yaml      # Phase 5 config
+│   │   └── README.md
+│   ├── 06-encryption/
+│   │   ├── kongctl/config.yaml      # Phase 6 config
+│   │   └── README.md
+│   ├── 07-schema-validation/
+│   │   ├── kongctl/config.yaml      # Phase 7 config
 │   │   └── README.md
 │   ├── A1-confluent-cloud/
 │   │   ├── kongctl/config.yaml      # Confluent variant

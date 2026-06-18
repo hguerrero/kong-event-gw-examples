@@ -39,7 +39,7 @@ kafkactl consume nw.ledger.transactions.high-value-wire-transfers.v1 \
 
 ## Configuration Details
 
-The phase-4 configuration adds:
+The phase-6 configuration adds:
 
 ```yaml
 static_keys:
@@ -82,15 +82,16 @@ virtual_clusters:
 
 ## Lifecycle
 
-Phase 4 builds on Phase 3. To move to Phase 5 (schema validation):
+Phase 6 builds on Phase 5 (ACL enforcement). To move to Phase 7 (schema validation):
 
 ```bash
 export TRANSACTION_ENCRYPTION_KEY=$(openssl rand -base64 32)
-kongctl apply -f ../06-schema-validation/kongctl/config.yaml
+kongctl apply -f ../07-schema-validation/kongctl/config.yaml
 ```
 
 ## See Also
 
 - [Auth Mediation](../04-auth-mediation/kongctl/config.yaml)
-- [Schema Validation](../06-schema-validation/kongctl/config.yaml)
+- [ACL Enforcement](../05-acl-enforcement/kongctl/config.yaml)
+- [Schema Validation](../07-schema-validation/kongctl/config.yaml)
 - [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)

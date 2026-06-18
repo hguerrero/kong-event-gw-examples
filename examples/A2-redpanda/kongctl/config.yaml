@@ -23,12 +23,20 @@ _defaults:
 
 event_gateways:
   - ref: keg-examples-gateway
-    name: KEG Examples Gateway
+    name: keg-examples-gateway
     description: Redpanda backend
+    labels:
+      env: example
+      project: keg-examples
 
     backend_clusters:
       - ref: redpanda-local
-        name: Redpanda Local
+        name: redpanda-local
+        labels:
+          env: example
+          role: message-broker
+          tier: backend
+          provider: redpanda
         authentication:
           type: anonymous
         bootstrap_servers:
@@ -39,6 +47,9 @@ event_gateways:
     listeners:
       - ref: redpanda-listener
         name: redpanda-listener
+        labels:
+          env: example
+          role: ingress
         addresses:
           - "0.0.0.0"
         ports:
@@ -47,6 +58,9 @@ event_gateways:
           - ref: forward-to-redpanda-vc
             type: forward_to_virtual_cluster
             name: forward-to-redpanda-vc
+            labels:
+              env: example
+              role: routing
             config:
               type: port_mapping
               destination:
@@ -59,6 +73,11 @@ event_gateways:
       - ref: redpanda-proxy
         name: redpanda-proxy
         description: Flat passthrough virtual cluster for Redpanda
+        labels:
+          env: example
+          role: virtual-cluster
+          tier: core
+          provider: redpanda
         destination:
           id: !ref redpanda-local
         acl_mode: passthrough

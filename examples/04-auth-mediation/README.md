@@ -67,15 +67,16 @@ kafkactl get topics
 
 ## Lifecycle
 
-Phase 3 builds on Phase 2. To move to Phase 4 (encryption):
+Phase 3 builds on Phase 2. To move to Phase 4 (ACL enforcement):
 
 ```bash
-kongctl apply -f ../05-encryption/kongctl/config.yaml
+kongctl apply -f ../05-acl-enforcement/kongctl/config.yaml
 ```
 
 ## See Also
 
 - [Topic Filter](../03-topic-filter/kongctl/config.yaml)
-- [Encryption](../05-encryption/kongctl/config.yaml)
-- [Schema Validation](../06-schema-validation/kongctl/config.yaml)
+- [ACL Enforcement](../05-acl-enforcement/kongctl/config.yaml)
+- [Encryption](../06-encryption/kongctl/config.yaml)
+- [Schema Validation](../07-schema-validation/kongctl/config.yaml)
 - [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)

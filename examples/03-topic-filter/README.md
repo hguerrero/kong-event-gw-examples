@@ -89,6 +89,7 @@ kongctl apply -f ../04-auth-mediation/kongctl/config.yaml
 
 - [Basic Proxy](../01-basic-proxy/kongctl/config.yaml)
 - [Auth Mediation](../04-auth-mediation/kongctl/config.yaml)
-- [Encryption](../05-encryption/kongctl/config.yaml)
-- [Schema Validation](../06-schema-validation/kongctl/config.yaml)
+- [ACL Enforcement](../05-acl-enforcement/kongctl/config.yaml)
+- [Encryption](../06-encryption/kongctl/config.yaml)
+- [Schema Validation](../07-schema-validation/kongctl/config.yaml)
 - [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)

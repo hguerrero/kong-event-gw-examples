@@ -1,17 +1,16 @@
 # ============================================================
-# Phase 2 — Topic Filter (Namespace Isolation)
+# Phase 5 — ACL Enforcement
 #
-# What this adds (on top of phase-1):
-#   - Two virtual clusters with namespace prefix isolation
-#   - team-a: prefix "A.", accessible on ports 19192-19290
-#   - team-b: prefix "B.", accessible on ports 19292-19390
-#   - Shared topics injected into both views
-#   - Auth still anonymous; ACLs still passthrough
+# What this adds (on top of phase-4):
+#   - Switches Team B from passthrough ACLs to enforce_on_gateway
+#   - Defines explicit allow rules for topics and consumer groups
+#   - Unauthenticated requests to Team B are now rejected
+#   - Team A remains in passthrough mode to demonstrate contrast
 #
-# Based on: examples/03-topic-filter
+# Based on: examples/05-acl-enforcement
 #
 # Apply:
-#   kongctl apply -f kongctl/phase-2-topic-filter.yaml
+#   kongctl apply -f kongctl/phase-5-acl-enforcement.yaml
 # ============================================================
 
 _defaults:
@@ -117,7 +116,7 @@ event_gateways:
     virtual_clusters:
       - ref: team-a
         name: team-a
-        description: Team A — namespace isolated with prefix "A."
+        description: Team A — anonymous access, passthrough ACLs
         labels:
           env: example
           role: virtual-cluster
@@ -138,14 +137,14 @@ event_gateways:
 
       - ref: team-b
         name: team-b
-        description: Team B — namespace isolated with prefix "B."
+        description: Team B — ACL enforcement at the gateway
         labels:
           env: example
           role: virtual-cluster
           team: team-b
         destination:
           id: !ref local-kafka
-        acl_mode: passthrough
+        acl_mode: enforce_on_gateway
         dns_label: team-b
         namespace:
           mode: hide_prefix
@@ -156,6 +155,64 @@ event_gateways:
                 glob: "nw.*"
         authentication:
           - type: anonymous
+          - type: sasl_plain
+            mediation: terminate
+            principals:
+              - username: team-b-user
+                password: secret
+
+        cluster_policies:
+          - ref: acl-team-b-readonly
+            type: acls
+            name: acl-team-b-readonly
+            labels:
+              env: example
+              role: access-control
+              team: team-b
+            condition: "context.auth.principal.name != 'team-b-user'"
+            config:
+              rules:
+                - action: allow
+                  resource_type: topic
+                  operations:
+                    - name: describe
+                    - name: read
+                  resource_names:
+                    - match: "*"
+                - action: allow
+                  resource_type: group
+                  operations:
+                    - name: read
+                  resource_names:
+                    - match: "*"
+
+          - ref: acl-team-b-fullaccess
+            type: acls
+            name: acl-team-b-fullaccess
+            labels:
+              env: example
+              role: access-control
+              team: team-b
+            condition: "context.auth.principal.name == 'team-b-user'"
+            config:
+              rules:
+                - action: allow
+                  resource_type: topic
+                  operations:
+                    - name: describe
+                    - name: read
+                    - name: write
+                  resource_names:
+                    - match: "*"
+                - action: allow
+                  resource_type: group
+                  operations:
+                    - name: describe
+                    - name: read
+                    - name: write
+                    - name: create
+                  resource_names:
+                    - match: "*"
 
       - ref: core-proxy
         name: core-proxy

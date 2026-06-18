@@ -1,0 +1,301 @@
+# ============================================================
+# Phase 7 — Schema Validation
+#
+# What this adds (on top of phase-4):
+#   - Schema registry registration (Apicurio in Confluent-compat mode)
+#   - Produce policy: schema validation on fraud risk scores
+#
+# Based on: examples/07-schema-validation
+#
+# Apply:
+#   kongctl apply -f kongctl/phase-7-schema-validation.yaml
+# ============================================================
+
+_defaults:
+  kongctl:
+    namespace: keg-examples
+
+event_gateways:
+  - ref: keg-examples-gateway
+    name: keg-examples-gateway
+    description: Kong Event Gateway Examples — local Kafka cluster
+    labels:
+      env: example
+      project: keg-examples
+
+    backend_clusters:
+      - ref: local-kafka
+        name: local-kafka
+        labels:
+          env: example
+          role: message-broker
+          tier: backend
+        authentication:
+          type: anonymous
+        bootstrap_servers:
+          - kafka1:9092
+          - kafka2:9092
+          - kafka3:9092
+        tls:
+          enabled: false
+        insecure_allow_anonymous_virtual_cluster_auth: true
+
+    static_keys:
+      - ref: transaction-encryption-key
+        name: transaction-encryption-key
+        description: Encryption key for high-value wire transfer events
+        labels:
+          env: example
+          role: encryption-key
+        value: !env TRANSACTION_ENCRYPTION_KEY
+
+    schema_registries:
+      - ref: apicurio-schema-registry
+        type: confluent
+        name: apicurio-schema-registry
+        description: Confluent-compatible schema registry powered by Apicurio
+        labels:
+          env: example
+          role: schema-registry
+        config:
+          schema_type: json
+          endpoint: http://apicurio-registry:8080/apis/ccompat/v7
+          timeout_seconds: 8
+
+    listeners:
+      - ref: core-listener
+        name: core-listener
+        labels:
+          env: example
+          role: ingress
+        addresses: ["0.0.0.0"]
+        ports: ["19092-19190"]
+        policies:
+          - ref: forward-to-core-proxy
+            type: forward_to_virtual_cluster
+            name: forward-to-core-proxy
+            labels:
+              env: example
+              role: routing
+            config:
+              type: port_mapping
+              destination:
+                id: !ref core-proxy
+              advertised_host: localhost
+              bootstrap_port: none
+              min_broker_id: 0
+
+      - ref: team-a-listener
+        name: team-a-listener
+        labels:
+          env: example
+          role: ingress
+          team: team-a
+        addresses: ["0.0.0.0"]
+        ports: ["19192-19290"]
+        policies:
+          - ref: forward-to-team-a
+            type: forward_to_virtual_cluster
+            name: forward-to-team-a
+            labels:
+              env: example
+              role: routing
+              team: team-a
+            config:
+              type: port_mapping
+              destination:
+                id: !ref team-a
+              advertised_host: localhost
+              bootstrap_port: none
+              min_broker_id: 0
+
+      - ref: team-b-listener
+        name: team-b-listener
+        labels:
+          env: example
+          role: ingress
+          team: team-b
+        addresses: ["0.0.0.0"]
+        ports: ["19292-19390"]
+        policies:
+          - ref: forward-to-team-b
+            type: forward_to_virtual_cluster
+            name: forward-to-team-b
+            labels:
+              env: example
+              role: routing
+              team: team-b
+            config:
+              type: port_mapping
+              destination:
+                id: !ref team-b
+              advertised_host: localhost
+              bootstrap_port: none
+              min_broker_id: 0
+
+    virtual_clusters:
+      - ref: team-a
+        name: team-a
+        description: Team A — anonymous access, passthrough ACLs
+        labels:
+          env: example
+          role: virtual-cluster
+          team: team-a
+        destination:
+          id: !ref local-kafka
+        acl_mode: passthrough
+        dns_label: team-a
+        namespace:
+          mode: hide_prefix
+          prefix: "A."
+          additional:
+            topics:
+              - type: glob
+                glob: "nw.*"
+        authentication:
+          - type: anonymous
+
+      - ref: team-b
+        name: team-b
+        description: Team B — ACL enforcement with schema validation on fraud topics (inherited ACLs)
+        labels:
+          env: example
+          role: virtual-cluster
+          team: team-b
+        destination:
+          id: !ref local-kafka
+        acl_mode: enforce_on_gateway
+        dns_label: team-b
+        namespace:
+          mode: hide_prefix
+          prefix: "B."
+          additional:
+            topics:
+              - type: glob
+                glob: "nw.*"
+        authentication:
+          - type: anonymous
+          - type: sasl_plain
+            mediation: terminate
+            principals:
+              - username: team-b-user
+                password: secret
+
+        cluster_policies:
+          - ref: acl-team-b-readonly
+            type: acls
+            name: acl-team-b-readonly
+            labels:
+              env: example
+              role: access-control
+              team: team-b
+            condition: "context.auth.principal.name != 'team-b-user'"
+            config:
+              rules:
+                - action: allow
+                  resource_type: topic
+                  operations:
+                    - name: describe
+                    - name: read
+                  resource_names:
+                    - match: "*"
+                - action: allow
+                  resource_type: group
+                  operations:
+                    - name: read
+                  resource_names:
+                    - match: "*"
+
+          - ref: acl-team-b-fullaccess
+            type: acls
+            name: acl-team-b-fullaccess
+            labels:
+              env: example
+              role: access-control
+              team: team-b
+            condition: "context.auth.principal.name == 'team-b-user'"
+            config:
+              rules:
+                - action: allow
+                  resource_type: topic
+                  operations:
+                    - name: describe
+                    - name: read
+                    - name: write
+                  resource_names:
+                    - match: "*"
+                - action: allow
+                  resource_type: group
+                  operations:
+                    - name: describe
+                    - name: read
+                    - name: write
+                    - name: create
+                  resource_names:
+                    - match: "*"
+
+        produce_policies:
+          - ref: fraud-risk-schema-validation
+            type: schema_validation
+            name: fraud-risk-schema-validation
+            labels:
+              env: example
+              role: schema-validation
+            description: Enforces schema validation on fraud risk score produce requests
+            enabled: true
+            condition: "context.topic.name == 'B.infosec.security.fraud.risk-scores.v3'"
+            config:
+              type: confluent_schema_registry
+              schema_registry:
+                id: !ref apicurio-schema-registry
+              value_validation_action: reject
+
+      - ref: core-proxy
+        name: core-proxy
+        description: Flat passthrough virtual cluster — all topics visible with encryption policies.
+        labels:
+          env: example
+          role: virtual-cluster
+          tier: core
+        destination:
+          id: !ref local-kafka
+        acl_mode: passthrough
+        dns_label: core-proxy
+        authentication:
+          - type: anonymous
+
+        produce_policies:
+          - ref: wire-transfer-encryption-policy
+            type: encrypt
+            name: wire-transfer-encryption-policy
+            labels:
+              env: example
+              role: encryption
+            description: Encrypts high-value wire transfer event values before they reach the broker
+            condition: 'context.topic.name == "nw.ledger.transactions.high-value-wire-transfers.v1"'
+            config:
+              failure_mode: error
+              part_of_record:
+                - value
+              encryption_key:
+                type: static
+                key:
+                  id: !ref transaction-encryption-key
+
+        consume_policies:
+          - ref: wire-transfer-decryption-policy
+            type: decrypt
+            name: wire-transfer-decryption-policy
+            labels:
+              env: example
+              role: encryption
+            description: Decrypts high-value wire transfer events transparently for authorised consumers
+            condition: 'context.topic.name == "nw.ledger.transactions.high-value-wire-transfers.v1"'
+            config:
+              failure_mode: error
+              part_of_record:
+                - value
+              key_sources:
+                - type: static
+                  key:
+                    id: !ref transaction-encryption-key

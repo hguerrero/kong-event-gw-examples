@@ -73,8 +73,9 @@ kongctl apply -f ../03-topic-filter/kongctl/config.yaml
 After mastering this basic setup, explore:
 - [Topic Filter](../03-topic-filter/kongctl/config.yaml) — namespace isolation  
 - [Auth Mediation](../04-auth-mediation/kongctl/config.yaml) — SASL/PLAIN authentication  
-- [Encryption](../05-encryption/kongctl/config.yaml) — message-level encryption  
-- [Schema Validation](../06-schema-validation/kongctl/config.yaml) — schema enforcement
+- [ACL Enforcement](../05-acl-enforcement/kongctl/config.yaml) — gateway-level ACLs
+- [Encryption](../06-encryption/kongctl/config.yaml) — message-level encryption
+- [Schema Validation](../07-schema-validation/kongctl/config.yaml) — schema enforcement
 
 ## See Also
 

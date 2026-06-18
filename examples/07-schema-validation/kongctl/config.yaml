@@ -173,6 +173,9 @@ event_gateways:
             topics:
               - type: glob
                 glob: "nw.*"
+              - type: exact_list
+                exact_list:
+                  - backend: infosec.security.fraud.risk-scores.v3                
         authentication:
           - type: anonymous
           - type: sasl_plain

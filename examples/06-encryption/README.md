@@ -31,10 +31,16 @@ kafkactl produce nw.ledger.transactions.high-value-wire-transfers.v1 \
 kafkactl consume nw.ledger.transactions.high-value-wire-transfers.v1 \
   --from-beginning --exit
 
-# Consume directly from Kafka (encrypted — unreadable):
-kafkactl config use-context default
+# Consume directly from Kafka (encrypted — unreadable) if exposed:
+kafkactl config use-context default 
 kafkactl consume nw.ledger.transactions.high-value-wire-transfers.v1 \
   --from-beginning --exit --print-headers
+
+# Using kafka script from docker
+docker exec -it kafka_cluster-kafka1-1 /opt/kafka/bin/kafka-console-consumer.sh \
+	--bootstrap-server kafka1:9092 \
+	--topic nw.ledger.transactions.high-value-wire-transfers.v1 \
+	--from-beginning --max-messages 1
 ```
 
 ## Configuration Details

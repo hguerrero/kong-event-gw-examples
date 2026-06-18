@@ -1,4 +1,5 @@
 infosec.security.fraud.anomaly-pings.v1
+infosec.security.fraud.risk-scores.v3
 nw.analytics.liquidity.yield.v1
 nw.analytics.liquidity.yield-reports.v1
 nw.ops.platform.capacity-efficiency.logs.v1
@@ -19,3 +20,4 @@ RETAIL_NY.branches.commuter-foot-traffic.v1
 RETAIL_NY.core.accounts.status.v2
 RETAIL_NY.core.customers.weather-impact-profiles.v1
 RETAIL_NY.payments.card-dispatch.v1
+test.topic

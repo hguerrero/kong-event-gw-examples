@@ -22,12 +22,12 @@ export TRANSACTION_ENCRYPTION_KEY=$(openssl rand -base64 32)
 kongctl apply -f kongctl/config.yaml
 
 # Produce valid message through Team B:
-kafkactl config use-context team-b-authed
-kafkactl produce B.infosec.security.fraud.risk-scores.v3 \
+kafkactl config use-context team-b-schema
+kafkactl produce infosec.security.fraud.risk-scores.v3 \
   --value='{"score":0.85,"account_id":"NW-001234","reason":"velocity_spike","evaluated_at":"2025-01-15T10:30:00Z"}'
 
 # Produce invalid message (will be rejected):
-kafkactl produce B.infosec.security.fraud.risk-scores.v3 \
+kafkactl produce infosec.security.fraud.risk-scores.v3 \
   --value='{"invalid":"data"}'
 ```
 
@@ -67,15 +67,15 @@ It uses JSON Schema (draft-07) and is stored in `kafka/config/schemas/fraud_risk
 
 ```bash
 # Valid fraud risk score event (will succeed):
-kafkactl produce B.infosec.security.fraud.risk-scores.v3 \
+kafkactl produce infosec.security.fraud.risk-scores.v3 \
   --value='{"score":0.42,"account_id":"NW-005678","reason":"geo_anomaly","evaluated_at":"2025-01-15T14:00:00Z"}'
 
 # Invalid — missing required field "score":
-kafkactl produce B.infosec.security.fraud.risk-scores.v3 \
+kafkactl produce infosec.security.fraud.risk-scores.v3 \
   --value='{"account_id":"NW-005678","reason":"geo_anomaly","evaluated_at":"2025-01-15T14:00:00Z"}'
 
 # Invalid — score out of range:
-kafkactl produce B.infosec.security.fraud.risk-scores.v3 \
+kafkactl produce infosec.security.fraud.risk-scores.v3 \
   --value='{"score":1.5,"account_id":"NW-005678","reason":"geo_anomaly","evaluated_at":"2025-01-15T14:00:00Z"}'
 ```
 

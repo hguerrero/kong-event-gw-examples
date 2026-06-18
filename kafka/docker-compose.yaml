@@ -119,6 +119,13 @@ services:
           --data "{\"schema\":\"$${SCHEMA_JSON}\",\"schemaType\":\"AVRO\"}" \
           http://apicurio-registry:8080/apis/ccompat/v7/subjects/nw.ledger.transactions.high-value-wire-transfers.v1-value/versions
 
+        FRAUD_SCHEMA_JSON=$$(cat /schemas/fraud_risk_scores.json | tr -d '\n' | sed 's/"/\\"/g')
+        echo "Registering JSON Schema via Confluent-compatible API..."
+        curl -sS -X POST \
+          -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+          --data "{\"schema\":\"$${FRAUD_SCHEMA_JSON}\",\"schemaType\":\"JSON\"}" \
+          http://apicurio-registry:8080/apis/ccompat/v7/subjects/infosec.security.fraud.risk-scores.v3-value/versions
+
         echo ""
         echo "Schema registration complete."
     networks:

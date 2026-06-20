@@ -38,11 +38,15 @@ event_gateways:
           tier: backend
           provider: redpanda
         authentication:
-          type: anonymous
+          algorithm: sha256
+          type: sasl_scram
+          password: ${env["KAFKA_PASSWORD"]}
+          username: ${env["KAFKA_USERNAME"]}
         bootstrap_servers:
           - redpanda-0:9092
         tls:
           enabled: false
+        insecure_allow_anonymous_virtual_cluster_auth: true
 
     listeners:
       - ref: redpanda-listener

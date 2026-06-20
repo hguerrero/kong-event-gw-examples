@@ -4,12 +4,18 @@ networks:
   keg:
     name: keg-network
     external: true
+  redpanda:
+    name: redpanda-network
+    external: true
 
 services:
   keg-data-plane:
     image: kong/kong-event-gateway:latest
     container_name: keg-data-plane
     restart: unless-stopped
+    profiles:
+      - kafka
+      - ""
     env_file:
       - konnect.env
     environment:
@@ -20,3 +26,21 @@ services:
       - "19092-19389:19092-19389"
     networks:
       - keg
+
+  keg-data-plane-redpanda:
+    image: kong/kong-event-gateway:latest
+    container_name: keg-data-plane
+    restart: unless-stopped
+    profiles:
+      - redpanda
+    env_file:
+      - konnect.env
+      - redpanda.env
+    environment:
+      KEG__OBSERVABILITY__LOG_FLAGS: info,keg=debug
+    volumes:
+      - ./kongctl/certs:/etc/keg/certs:ro
+    ports:
+      - "9192-9389:9192-9389"
+    networks:
+      - redpanda

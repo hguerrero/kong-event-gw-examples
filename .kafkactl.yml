@@ -5,6 +5,9 @@ contexts:
     core-proxy:
       brokers:
         - localhost:19092
+    redpanda:
+      brokers:
+        - localhost:9192
     team-a:
       brokers:
         - localhost:19192

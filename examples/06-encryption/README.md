@@ -1,4 +1,4 @@
-# Phase 5 — Field-Level Encryption: Wire Transfers
+# Phase 5 — Payload Encryption: Wire Transfers
 
 Northwind Financial's compliance team has flagged that high-value wire transfer events land on the Kafka broker as plaintext. Anyone with broker-level access can read them. This phase adds transparent produce/consume encryption on the `nw.ledger.transactions.high-value-wire-transfers.v1` topic — the gateway encrypts on produce and decrypts on consume. Producers and consumers change nothing.
 

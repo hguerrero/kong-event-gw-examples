@@ -56,7 +56,7 @@ flowchart TD
 
 ```bash
 docker compose -f kafka/docker-compose.yaml up -d
-docker compose --profile init -f kafka/docker-compose.yaml up
+docker compose --profile init -f kafka/docker-compose.yaml up -d
 ```
 
 ### Step 2 — Register the Data Plane Certificate

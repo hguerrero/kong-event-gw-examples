@@ -24,7 +24,7 @@ kongctl apply -f kongctl/config.yaml
 kafkactl config use-context core-proxy
 kafkactl get topics
 kafkactl create topic nw.ops.test.hello-world.v1
-kafkactl produce nw.ops.test.hello-world.v1 --value="Hello from Northwind via KEG!"
+kafkactl produce nw.ops.test.hello-world.v1 --value="Hello from Northwind via KEG"
 kafkactl consume nw.ops.test.hello-world.v1 --from-beginning --exit
 ```
 

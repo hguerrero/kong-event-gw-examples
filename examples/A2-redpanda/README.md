@@ -4,16 +4,7 @@ This variant swaps the local Kafka cluster for a Redpanda cluster as the backend
 
 ## Setup Diagram
 
-```mermaid
-flowchart LR
-    C["kafkactl\nanonymous"] -->|":19092"| G
-
-    subgraph G["KEG Data Plane"]
-        VC["core-proxy VC\npassthrough · anonymous"]
-    end
-
-    G -->|"anonymous · :9092"| RP["🐼 Redpanda Cluster\nKafka-compatible\nredpanda-0:9092"]
-```
+![Redpanda backend](diagram.png)
 
 ## What It Does
 

@@ -4,30 +4,7 @@ Northwind Financial's two business units have been stepping on each other's cons
 
 ## Setup Diagram
 
-```mermaid
-flowchart TD
-    C1["🏦 Branch App\nanonymous"] -->|":19192"| RVC
-    C2["💼 Advisor App\nanonymous"] -->|":19292"| WVC
-    C3["⚙️ Ops / Core\nanonymous"] -->|":19092"| CVC
-
-    subgraph DP["KEG Data Plane"]
-        CVC["core-proxy VC\npassthrough · all topics"]
-        RVC["retail-banking-ny VC\nprefix RETAIL_NY.\nhides WEALTH_LA.*"]
-        WVC["wealth-management-la VC\nprefix WEALTH_LA.\nhides RETAIL_NY.*"]
-    end
-
-    subgraph K["Kafka Cluster"]
-        T1["RETAIL_NY.payments.card-dispatch.v1\nRETAIL_NY.markets.exchange-ticker.v1\nRETAIL_NY.branches.commuter-foot-traffic.v1"]
-        T2["WEALTH_LA.clients.sentiment-signals.v1\nWEALTH_LA.advisor.daily-client-activity.v1\nWEALTH_LA.portfolios.esg-allocation-adjustments.v1"]
-        T3["nw.* shared topics\ninfosec.security.*"]
-    end
-
-    RVC -->|"RETAIL_NY.* + nw.*"| T1
-    RVC -->|"injected"| T3
-    WVC -->|"WEALTH_LA.* + nw.*"| T2
-    WVC -->|"injected"| T3
-    CVC --> T1 & T2 & T3
-```
+![Topic Filter — tenant namespace isolation](diagram.png)
 
 ## What It Does
 

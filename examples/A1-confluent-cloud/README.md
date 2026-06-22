@@ -4,18 +4,7 @@ Northwind Financial's cloud team is evaluating Confluent Cloud as a managed Kafk
 
 ## Setup Diagram
 
-```mermaid
-flowchart LR
-    C["kafkactl\nanonymous"] -->|":19092"| G
-
-    subgraph G["KEG Data Plane"]
-        VC["core-proxy VC\nmediation: use_backend_cluster\nClient credentials never forwarded"]
-    end
-
-    G -->|"SASL/PLAIN + TLS\n(gateway's own API key)"| CC["☁️ Confluent Cloud\nKafka Cluster"]
-
-    ENV["🔑 KAFKA_USERNAME / KAFKA_PASSWORD\n(env vars — gateway only)"] -.->|"loaded at startup"| G
-```
+![Confluent Cloud backend](diagram.png)
 
 ## What It Does
 

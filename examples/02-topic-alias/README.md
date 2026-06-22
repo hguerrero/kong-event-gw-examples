@@ -4,6 +4,10 @@ This is a concept reference, not a runnable phase. It documents how to use CEL (
 
 In the Northwind Financial story, the prefix approach (`RETAIL_NY.`, `WEALTH_LA.`) is used for its simplicity. CEL-based aliasing is useful when you need non-prefix transformations: renaming legacy topic names, exposing a canonical alias while the backend uses a versioned name, or mapping across naming conventions.
 
+## Diagram
+
+![Topic Alias — CEL-based name rewriting](diagram.png)
+
 ## What It Does
 
 - Dynamic topic name transformation using CEL expressions

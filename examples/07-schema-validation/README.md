@@ -4,26 +4,7 @@ A bad deploy last quarter pushed malformed JSON to the fraud risk score topic an
 
 ## Setup Diagram
 
-```mermaid
-flowchart TD
-    A["💼 wealth-advisors\nSASL/PLAIN · :19292"]
-
-    A -->|"produce: infosec.security.fraud.risk-scores.v3"| G
-
-    subgraph G["wealth-management-la VC · produce_policy: schema_validation"]
-        V{"Valid schema?"}
-    end
-
-    SR["📋 Apicurio Schema Registry\nsubject: infosec.security.fraud.risk-scores.v3-value\nscore: number 0–1, account_id, reason, evaluated_at"]
-
-    G <-->|"validate against"| SR
-
-    V -->|"✅ conforms"| K["Kafka Broker\n(clean data only)"]
-    V -->|"❌ rejected\nINVALID_RECORD"| E["Error returned to producer\n(never reaches broker)"]
-
-    style E fill:#fee2e2,stroke:#ef4444
-    style K fill:#dcfce7,stroke:#16a34a
-```
+![Schema Validation — validate against the schema registry](diagram.png)
 
 ## What It Does
 

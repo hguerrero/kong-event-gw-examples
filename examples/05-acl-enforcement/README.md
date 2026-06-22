@@ -4,24 +4,7 @@ The infosec team wants to lock down who can produce to sensitive topics and prev
 
 ## Setup Diagram
 
-```mermaid
-flowchart TD
-    B["🏦 Branch App\nanonymous"] -->|":19192"| RVC["retail-banking-ny VC\nacl_mode: passthrough\nFull access to RETAIL_NY.*"]
-
-    A1["📱 Internal service\nanonymous"] -->|":19292"| WVC
-    A2["💼 Advisor App\nwealth-advisors / secret\nSASL/PLAIN"] -->|":19292"| WVC
-
-    subgraph WVC["wealth-management-la VC · acl_mode: enforce_on_gateway"]
-        P1["acl-wealth-management-la\ncondition: principal != 'wealth-advisors'\n✅ describe, read\n❌ write · ❌ infosec.*"]
-        P2["acl-wealth-management-la-advisors\ncondition: principal == 'wealth-advisors'\n✅ describe, read, write\n✅ infosec.security.fraud.risk-scores.v3"]
-    end
-
-    RVC --> K["Kafka Cluster\n(ACLs disabled on broker)"]
-    WVC --> K
-
-    style P1 fill:#fee2e2,stroke:#ef4444
-    style P2 fill:#dcfce7,stroke:#16a34a
-```
+![ACL Enforcement — identity-based access control](diagram.png)
 
 ## What It Does
 

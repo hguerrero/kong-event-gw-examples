@@ -4,25 +4,7 @@ Northwind Financial's compliance team has flagged that high-value wire transfer 
 
 ## Setup Diagram
 
-```mermaid
-sequenceDiagram
-    participant P as Producer<br/>(kafkactl)
-    participant G as KEG · core-proxy VC
-    participant K as Kafka Broker
-    participant C as Consumer<br/>(kafkactl)
-
-    Note over G: produce_policy: encrypt<br/>condition: topic == nw.ledger...wire-transfers.v1<br/>key: TRANSACTION_ENCRYPTION_KEY
-
-    P->>G: { "full_name": "Eleanor Hartwell", "amount": 4500000, ... }
-    G->>K: ÄxØ9ïþ... (ciphertext stored on broker)
-
-    Note over G: consume_policy: decrypt<br/>condition: topic == nw.ledger...wire-transfers.v1<br/>key_sources: static key
-
-    K->>G: ÄxØ9ïþ... (ciphertext from broker)
-    G->>C: { "full_name": "Eleanor Hartwell", "amount": 4500000, ... }
-
-    Note over K: Direct broker read (bypassing gateway)<br/>→ ÄxØ9ïþ... (unreadable)
-```
+![Encryption — encrypt on produce, decrypt on consume](diagram.png)
 
 ## What It Does
 

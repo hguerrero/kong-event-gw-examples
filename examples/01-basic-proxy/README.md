@@ -4,19 +4,7 @@ Northwind Financial's first step: put Kong Event Gateway in front of the Kafka c
 
 ## Setup Diagram
 
-```mermaid
-flowchart LR
-    subgraph before["Before — direct Kafka access"]
-        A1["App"] -->|":9092"| K1["kafka1\nkafka2\nkafka3\n(open to all)"]
-    end
-
-    subgraph after["After — gateway in front"]
-        A2["App\n(kafkactl)"] -->|":19092"| G["KEG Data Plane\ncore-proxy VC\npassthrough · anonymous"]
-        G -->|":9092"| K2["kafka1\nkafka2\nkafka3"]
-    end
-
-    KC["☁️ Konnect\nkongctl apply"] -.->|configures| G
-```
+![Basic Proxy — gateway in front of Kafka](diagram.png)
 
 ## What It Does
 

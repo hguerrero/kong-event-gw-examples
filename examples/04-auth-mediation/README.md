@@ -4,24 +4,7 @@ The Wealth Management team wants to lock down their virtual cluster so only cred
 
 ## Setup Diagram
 
-```mermaid
-flowchart LR
-    subgraph retail["Retail Banking NY — network trust"]
-        B["🏦 Branch App\nanonymous"] -->|":19192"| RVC["retail-banking-ny VC\nanonymous · passthrough"]
-    end
-
-    subgraph wealth["Wealth Management LA — credential required"]
-        A["💼 Advisor App\nwealth-advisors / secret"] -->|"SASL/PLAIN\n:19292"| WVC
-        subgraph WVC["wealth-management-la VC"]
-            T["mediation: terminate\n✅ validates credential\n🔒 credential stops here"]
-        end
-    end
-
-    RVC -->|"anonymous"| K["Kafka Cluster\n(zero SASL users)"]
-    WVC -->|"anonymous (internal)"| K
-
-    style T fill:#fef3c7,stroke:#d97706
-```
+![Auth Mediation — credentials terminated at the gateway](diagram.png)
 
 ## What It Does
 

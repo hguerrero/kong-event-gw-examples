@@ -1,51 +1,61 @@
-# Message-Level Encryption Example
+# Phase 5 — Field-Level Encryption: Wire Transfers
 
-This example demonstrates how to configure Kong Event Gateway for automatic message encryption and decryption using symmetric key encryption.
+Northwind Financial's compliance team has flagged that high-value wire transfer events land on the Kafka broker as plaintext. Anyone with broker-level access can read them. This phase adds transparent produce/consume encryption on the `nw.ledger.transactions.high-value-wire-transfers.v1` topic — the gateway encrypts on produce and decrypts on consume. Producers and consumers change nothing.
 
-> **Note:** This example uses a kongctl configuration at
-> [`kongctl/config.yaml`](kongctl/config.yaml).
+## Setup Diagram
+
+```mermaid
+sequenceDiagram
+    participant P as Producer<br/>(kafkactl)
+    participant G as KEG · core-proxy VC
+    participant K as Kafka Broker
+    participant C as Consumer<br/>(kafkactl)
+
+    Note over G: produce_policy: encrypt<br/>condition: topic == nw.ledger...wire-transfers.v1<br/>key: TRANSACTION_ENCRYPTION_KEY
+
+    P->>G: { "full_name": "Eleanor Hartwell", "amount": 4500000, ... }
+    G->>K: ÄxØ9ïþ... (ciphertext stored on broker)
+
+    Note over G: consume_policy: decrypt<br/>condition: topic == nw.ledger...wire-transfers.v1<br/>key_sources: static key
+
+    K->>G: ÄxØ9ïþ... (ciphertext from broker)
+    G->>C: { "full_name": "Eleanor Hartwell", "amount": 4500000, ... }
+
+    Note over K: Direct broker read (bypassing gateway)<br/>→ ÄxØ9ïþ... (unreadable)
+```
 
 ## What It Does
 
-- Automatic encryption of message values during produce
-- Automatic decryption of message values during consume
-- Static encryption key loaded from environment variable
-- Transparent encryption/decryption — clients don't handle crypto
-- No changes required to producers or consumers
+- Automatic encryption of wire transfer message values during produce
+- Automatic decryption during consume — clients receive plaintext transparently
+- Static encryption key loaded from `TRANSACTION_ENCRYPTION_KEY` environment variable
+- Policy fires only on the wire transfer topic (condition-gated)
+- All other topics unaffected
 
 ## How to Use
 
 ```bash
-# Generate an encryption key:
 export TRANSACTION_ENCRYPTION_KEY=$(openssl rand -base64 32)
 
-# Apply the phase configuration:
 kongctl apply -f kongctl/config.yaml
 
-# Test producing through the gateway (encrypted):
+# Produce a wire transfer event through the gateway (encrypted at the edge):
 kafkactl config use-context core-proxy
 kafkactl produce nw.ledger.transactions.high-value-wire-transfers.v1 \
-  --value='{"transaction_id":"tx-001","amount":500000}'
+  --value='{"transaction_id":"TXN-20240612-001","customer_id":"NW-C-88421","full_name":"Eleanor Hartwell","amount":4500000}'
 
-# Consume through the gateway (decrypted):
+# Consume through the gateway (decrypted transparently):
 kafkactl consume nw.ledger.transactions.high-value-wire-transfers.v1 \
   --from-beginning --exit
 
-# Consume directly from Kafka (encrypted — unreadable) if exposed:
-kafkactl config use-context default 
-kafkactl consume nw.ledger.transactions.high-value-wire-transfers.v1 \
-  --from-beginning --exit --print-headers
-
-# Using kafka script from docker
+# Read raw bytes directly from Kafka (bypassing gateway) — shows ciphertext:
 docker exec -it kafka_cluster-kafka1-1 /opt/kafka/bin/kafka-console-consumer.sh \
-	--bootstrap-server kafka1:9092 \
-	--topic nw.ledger.transactions.high-value-wire-transfers.v1 \
-	--from-beginning --max-messages 1
+  --bootstrap-server kafka1:9092 \
+  --topic nw.ledger.transactions.high-value-wire-transfers.v1 \
+  --from-beginning --max-messages 1
 ```
 
 ## Configuration Details
-
-The phase-6 configuration adds:
 
 ```yaml
 static_keys:
@@ -59,6 +69,7 @@ virtual_clusters:
         type: encrypt
         condition: 'context.topic.name == "nw.ledger.transactions.high-value-wire-transfers.v1"'
         config:
+          failure_mode: error
           part_of_record:
             - value
           encryption_key:
@@ -71,6 +82,7 @@ virtual_clusters:
         type: decrypt
         condition: 'context.topic.name == "nw.ledger.transactions.high-value-wire-transfers.v1"'
         config:
+          failure_mode: error
           part_of_record:
             - value
           key_sources:
@@ -79,25 +91,19 @@ virtual_clusters:
                 id: !ref transaction-encryption-key
 ```
 
-### Key Concepts
+## Key Concepts
 
-- **Static Key**: A fixed encryption key stored in the gateway configuration, loaded from environment
-- **Produce Policy**: Applied to messages being produced — can encrypt, validate schema, etc.
-- **Consume Policy**: Applied to messages being consumed — can decrypt, transform, etc.
-- **failure_mode: error**: If encryption/decryption fails, the operation is rejected
+- **Static Key**: Loaded from an environment variable at gateway startup — never touches the broker
+- **Produce Policy**: Applied to messages before they reach Kafka
+- **Consume Policy**: Applied to messages on the way out to the consumer
+- **failure_mode: error**: Reject the operation if encryption/decryption fails (rather than pass through)
+- **part_of_record: [value]**: Only the message value is encrypted; key and headers remain plaintext
 
-## Lifecycle
-
-Phase 6 builds on Phase 5 (ACL enforcement). To move to Phase 7 (schema validation):
+## Next
 
 ```bash
 export TRANSACTION_ENCRYPTION_KEY=$(openssl rand -base64 32)
 kongctl apply -f ../07-schema-validation/kongctl/config.yaml
 ```
 
-## See Also
-
-- [Auth Mediation](../04-auth-mediation/kongctl/config.yaml)
-- [ACL Enforcement](../05-acl-enforcement/kongctl/config.yaml)
-- [Schema Validation](../07-schema-validation/kongctl/config.yaml)
-- [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)
+Moves to Phase 6: schema validation on fraud risk score topics.

@@ -1,39 +1,68 @@
-# Schema Validation Example
+# Phase 6 — Schema Validation: Fraud Risk Scores
 
-This example demonstrates how to configure Kong Event Gateway to enforce schema validation on Kafka messages using Apicurio Schema Registry.
+A bad deploy last quarter pushed malformed JSON to the fraud risk score topic and poisoned a downstream ML model's training set. This phase registers Apicurio Schema Registry with the gateway and enforces a JSON Schema contract on `infosec.security.fraud.risk-scores.v3`. Malformed messages are rejected at the gateway before they ever reach the broker — the ML pipeline is protected without any producer-side changes.
 
-> **Note:** This example uses a kongctl configuration at
-> [`kongctl/config.yaml`](kongctl/config.yaml).
+## Setup Diagram
+
+```mermaid
+flowchart TD
+    A["💼 wealth-advisors\nSASL/PLAIN · :19292"]
+
+    A -->|"produce: infosec.security.fraud.risk-scores.v3"| G
+
+    subgraph G["wealth-management-la VC · produce_policy: schema_validation"]
+        V{"Valid schema?"}
+    end
+
+    SR["📋 Apicurio Schema Registry\nsubject: infosec.security.fraud.risk-scores.v3-value\nscore: number 0–1, account_id, reason, evaluated_at"]
+
+    G <-->|"validate against"| SR
+
+    V -->|"✅ conforms"| K["Kafka Broker\n(clean data only)"]
+    V -->|"❌ rejected\nINVALID_RECORD"| E["Error returned to producer\n(never reaches broker)"]
+
+    style E fill:#fee2e2,stroke:#ef4444
+    style K fill:#dcfce7,stroke:#16a34a
+```
 
 ## What It Does
 
-- Registers Apicurio Schema Registry (Confluent-compatible mode) in the gateway
-- Enforces JSON schema validation on fraud risk score topics
-- Rejects non-conformant produce requests before they reach the broker
-- ACL enforcement on Team B carried forward from Phase 5 (read-only for anonymous, full access for team-b-user)
+- Registers Apicurio Schema Registry (Confluent-compatible API) in the gateway
+- Enforces JSON Schema on `infosec.security.fraud.risk-scores.v3` produce requests
+- Rejects non-conformant messages before they reach the broker
+- ACL enforcement from Phase 4 is carried forward — `wealth-advisors` required for produce
+- Wire transfer encryption from Phase 5 is also still active
 
 ## How to Use
 
 ```bash
-# Ensure encryption key is set (carried over from Phase 6):
 export TRANSACTION_ENCRYPTION_KEY=$(openssl rand -base64 32)
 
-# Apply the phase configuration:
 kongctl apply -f kongctl/config.yaml
 
-# Produce valid message through Team B:
-kafkactl config use-context team-b-schema
+# Produce a valid fraud risk event (wealth-advisors context has the schema registry configured):
+kafkactl config use-context wealth-advisors-schema
 kafkactl produce infosec.security.fraud.risk-scores.v3 \
-  --value='{"score":0.85,"account_id":"NW-001234","reason":"velocity_spike","evaluated_at":"2025-01-15T10:30:00Z"}'
+  --value='{"score":0.87,"account_id":"NW-001234","reason":"velocity_spike","evaluated_at":"2026-06-12T14:32:45Z"}'
 
-# Produce invalid message (will be rejected):
+# Produce an invalid message — rejected at the gateway:
 kafkactl produce infosec.security.fraud.risk-scores.v3 \
-  --value='{"invalid":"data"}'
+  --value='{"score":"HIGH","acct":"NW-001234"}'
+# → INVALID_RECORD — schema validation failed
+```
+
+## Register the Schema (First Time)
+
+The schema is registered automatically by the Kafka init container. To register manually:
+
+```bash
+curl -s -X POST \
+  http://localhost:8080/apis/ccompat/v7/subjects/infosec.security.fraud.risk-scores.v3-value/versions \
+  -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+  -d "{\"schemaType\": \"JSON\", \"schema\": $(cat kafka/config/schemas/fraud_risk_scores.json | jq -Rs .)}"
 ```
 
 ## Configuration Details
-
-The phase-7 configuration adds schema validation to Team B:
 
 ```yaml
 schema_registries:
@@ -45,12 +74,11 @@ schema_registries:
       timeout_seconds: 8
 
 virtual_clusters:
-  - ref: team-b
-    acl_mode: enforce_on_gateway
+  - ref: wealth-management-la
     produce_policies:
       - ref: fraud-risk-schema-validation
         type: schema_validation
-        condition: "context.topic.name == 'B.infosec.security.fraud.risk-scores.v3'"
+        condition: "context.topic.name == 'WEALTH_LA.infosec.security.fraud.risk-scores.v3'"
         config:
           type: confluent_schema_registry
           schema_registry:
@@ -58,31 +86,27 @@ virtual_clusters:
           value_validation_action: reject
 ```
 
-### Schema Registration
+The `condition` fires only when the topic matches — other topics in the Wealth Management cluster are unaffected.
 
-The fraud risk score schema is registered at topic creation via the Kafka init container.
-It uses JSON Schema (draft-07) and is stored in `kafka/config/schemas/fraud_risk_scores.json`.
+## Schema Requirements (fraud_risk_scores.json)
 
-## Testing
+Required fields: `score` (number, 0.0–1.0), `account_id` (string), `reason` (string), `evaluated_at` (ISO 8601 datetime string).
 
 ```bash
-# Valid fraud risk score event (will succeed):
-kafkactl produce infosec.security.fraud.risk-scores.v3 \
-  --value='{"score":0.42,"account_id":"NW-005678","reason":"geo_anomaly","evaluated_at":"2025-01-15T14:00:00Z"}'
+# Valid example:
+{"score":0.42,"account_id":"NW-005678","reason":"geo_anomaly","evaluated_at":"2026-01-15T14:00:00Z"}
 
-# Invalid — missing required field "score":
-kafkactl produce infosec.security.fraud.risk-scores.v3 \
-  --value='{"account_id":"NW-005678","reason":"geo_anomaly","evaluated_at":"2025-01-15T14:00:00Z"}'
+# Invalid — missing score:
+{"account_id":"NW-005678","reason":"geo_anomaly","evaluated_at":"2026-01-15T14:00:00Z"}
 
 # Invalid — score out of range:
-kafkactl produce infosec.security.fraud.risk-scores.v3 \
-  --value='{"score":1.5,"account_id":"NW-005678","reason":"geo_anomaly","evaluated_at":"2025-01-15T14:00:00Z"}'
+{"score":1.5,"account_id":"NW-005678","reason":"geo_anomaly","evaluated_at":"2026-01-15T14:00:00Z"}
 ```
 
 ## See Also
 
-- [Encryption](../06-encryption/kongctl/config.yaml)
-- [ACL Enforcement](../05-acl-enforcement/kongctl/config.yaml)
+- [Encryption](../06-encryption/README.md) — Phase 5 (active in this config)
+- [ACL Enforcement](../05-acl-enforcement/README.md) — Phase 4 (active in this config)
 - [Kafka schema definitions](../../kafka/config/schemas/)
 - [Apicurio Registry Documentation](https://www.apicur.io/registry/)
 - [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)

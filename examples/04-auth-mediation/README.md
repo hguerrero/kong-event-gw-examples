@@ -1,45 +1,59 @@
-# Authentication Mediation Example
+# Phase 3 — Auth Mediation: Credentials at the Edge
 
-This example demonstrates how to configure Kong Event Gateway with SASL/PLAIN authentication, where credentials are terminated at the gateway and never forwarded to Kafka.
+The Wealth Management team wants to lock down their virtual cluster so only credentialed advisors can connect. But they can't add SASL users to the Kafka cluster — that requires broker admin access and a change freeze window. With `mediation: terminate`, the gateway validates credentials itself and connects to Kafka anonymously. Kafka never sees the credentials.
 
-> **Note:** This example uses a kongctl configuration at
-> [`kongctl/config.yaml`](kongctl/config.yaml).
+## Setup Diagram
+
+```mermaid
+flowchart LR
+    subgraph retail["Retail Banking NY — network trust"]
+        B["🏦 Branch App\nanonymous"] -->|":19192"| RVC["retail-banking-ny VC\nanonymous · passthrough"]
+    end
+
+    subgraph wealth["Wealth Management LA — credential required"]
+        A["💼 Advisor App\nwealth-advisors / secret"] -->|"SASL/PLAIN\n:19292"| WVC
+        subgraph WVC["wealth-management-la VC"]
+            T["mediation: terminate\n✅ validates credential\n🔒 credential stops here"]
+        end
+    end
+
+    RVC -->|"anonymous"| K["Kafka Cluster\n(zero SASL users)"]
+    WVC -->|"anonymous (internal)"| K
+
+    style T fill:#fef3c7,stroke:#d97706
+```
 
 ## What It Does
 
-- SASL/PLAIN authentication for Team B with `mediation: terminate`
-- Team A stays anonymous (network-level access)
-- Credentials are validated at the gateway — Kafka never sees them
-- Gateway handles auth so Kafka can remain in anonymous mode
+- Retail Banking NY stays anonymous (internal systems use network-level trust)
+- Wealth Management LA requires SASL/PLAIN (`wealth-advisors` / `secret`)
+- `mediation: terminate` — credentials are validated at the gateway, never forwarded to Kafka
+- Kafka remains in anonymous mode; the gateway is the only entity it trusts
 
 ## How to Use
 
 ```bash
-# Apply the phase configuration:
 kongctl apply -f kongctl/config.yaml
 
-# Test authenticated access to Team B:
-kafkactl config use-context team-b-authed
+# Wealth Management — authenticated access:
+kafkactl config use-context wealth-advisors
 kafkactl get topics
 
-# Test anonymous access (still works for Team A):
-kafkactl config use-context team-a
+# Retail Banking NY — still anonymous:
+kafkactl config use-context retail-banking-ny
 kafkactl get topics
 ```
 
 ## Configuration Details
 
-The phase-3 configuration adds SASL/PLAIN to Team B:
-
 ```yaml
 virtual_clusters:
-  - ref: team-b
+  - ref: wealth-management-la
     authentication:
-      - type: anonymous
       - type: sasl_plain
-        mediation: terminate
+        mediation: terminate        # credentials stop here; Kafka never sees them
         principals:
-          - username: team-b-user
+          - username: wealth-advisors
             password: secret
 ```
 
@@ -47,36 +61,12 @@ virtual_clusters:
 
 - **terminate**: Gateway validates credentials, then connects to Kafka anonymously
 - **forward**: Gateway forwards credentials to Kafka for backend validation
-- **use_backend_cluster**: Gateway uses the backend cluster's authentication
+- **use_backend_cluster**: Gateway uses the backend cluster's own authentication config
 
-## Testing
-
-```bash
-# Team B with SASL/PLAIN auth:
-kafkactl config use-context team-b-authed
-kafkactl get topics
-
-# Team B without auth (will fail if auth is required):
-kafkactl config use-context team-b
-kafkactl get topics  # May fail depending on acl_mode
-
-# Team A stays anonymous:
-kafkactl config use-context team-a
-kafkactl get topics
-```
-
-## Lifecycle
-
-Phase 3 builds on Phase 2. To move to Phase 4 (ACL enforcement):
+## Next
 
 ```bash
 kongctl apply -f ../05-acl-enforcement/kongctl/config.yaml
 ```
 
-## See Also
-
-- [Topic Filter](../03-topic-filter/kongctl/config.yaml)
-- [ACL Enforcement](../05-acl-enforcement/kongctl/config.yaml)
-- [Encryption](../06-encryption/kongctl/config.yaml)
-- [Schema Validation](../07-schema-validation/kongctl/config.yaml)
-- [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)
+Moves to Phase 4: gateway-enforced ACLs — anonymous connections get read-only access, `wealth-advisors` gets full access including infosec topics.

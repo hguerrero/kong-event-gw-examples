@@ -1,32 +1,42 @@
-# Redpanda Integration Example
+# Variant A2 — Redpanda Backend
 
-This example demonstrates how to configure Kong Event Gateway to connect to a Redpanda cluster as the backend.
+This variant swaps the local Kafka cluster for a Redpanda cluster as the backend. Northwind Financial's platform team is evaluating Redpanda as a drop-in Kafka replacement. The gateway config is unchanged — only the backend cluster definition differs.
 
-> **Note:** This example uses a kongctl configuration at
-> [`kongctl/config.yaml`](kongctl/config.yaml).
+## Setup Diagram
+
+```mermaid
+flowchart LR
+    C["kafkactl\nanonymous"] -->|":19092"| G
+
+    subgraph G["KEG Data Plane"]
+        VC["core-proxy VC\npassthrough · anonymous"]
+    end
+
+    G -->|"anonymous · :9092"| RP["🐼 Redpanda Cluster\nKafka-compatible\nredpanda-0:9092"]
+```
 
 ## What It Does
 
 - Replaces the local Kafka cluster with a Redpanda backend
 - Anonymous authentication to Redpanda
-- Flat passthrough virtual cluster
-- Alternative backend for testing with Redpanda
+- Flat passthrough virtual cluster — same topology as Phase 1 but against Redpanda
+- All phase features (namespaces, auth, ACLs, encryption, schema validation) work identically
 
 ## How to Use
 
 ```bash
-# 1. Start Redpanda (separately, or use a Redpanda docker-compose)
+# Start Redpanda (separately or via its own docker-compose):
+docker compose -f redpanda/docker-compose.yaml up -d
 
-# 2. Apply the variant configuration (replaces any phase config):
+# Apply the variant config (replaces any phase config):
 kongctl apply -f kongctl/config.yaml
 
-# 3. Test the connection:
-kafkactl get topics --bootstrap-server localhost:9192
+# Test the connection:
+kafkactl config use-context core-proxy
+kafkactl get topics
 ```
 
 ## Configuration Details
-
-The variant configuration defines:
 
 ```yaml
 backend_clusters:
@@ -46,12 +56,11 @@ virtual_clusters:
 
 ## Variant vs Phase
 
-Variants are **alternative** configurations, not cumulative phases. Apply a variant
-instead of the phase files to use a different backend platform.
+This is an **alternative** backend, not a cumulative phase. Apply it instead of the numbered phases to use Redpanda as the broker. The full phase sequence (namespace isolation, auth termination, ACL enforcement, encryption, schema validation) works the same way against Redpanda.
 
 ## See Also
 
-- [Confluent Cloud variant](../A1-confluent-cloud/kongctl/config.yaml)
-- [Basic Proxy](../01-basic-proxy/kongctl/config.yaml)
+- [Confluent Cloud variant](../A1-confluent-cloud/README.md)
+- [Phase 1 — Basic Proxy](../01-basic-proxy/README.md)
 - [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)
 - [Redpanda Documentation](https://docs.redpanda.com/)

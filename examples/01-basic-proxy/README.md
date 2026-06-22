@@ -1,16 +1,29 @@
-# Basic Kafka Proxy Example
+# Phase 1 — Basic Proxy
 
-This example demonstrates the basic proxy functionality of Kong Event Gateway — putting a transparent gateway in front of Kafka without touching any broker configuration.
+Northwind Financial's first step: put Kong Event Gateway in front of the Kafka cluster without touching a single broker config. The gateway acts as a transparent proxy — all topics are visible, no auth, no policies.
 
-> **Note:** This example uses a kongctl configuration at
-> [`kongctl/config.yaml`](kongctl/config.yaml).
+## Setup Diagram
+
+```mermaid
+flowchart LR
+    subgraph before["Before — direct Kafka access"]
+        A1["App"] -->|":9092"| K1["kafka1\nkafka2\nkafka3\n(open to all)"]
+    end
+
+    subgraph after["After — gateway in front"]
+        A2["App\n(kafkactl)"] -->|":19092"| G["KEG Data Plane\ncore-proxy VC\npassthrough · anonymous"]
+        G -->|":9092"| K2["kafka1\nkafka2\nkafka3"]
+    end
+
+    KC["☁️ Konnect\nkongctl apply"] -.->|configures| G
+```
 
 ## What It Does
 
-- Registers a 3-broker Kafka cluster as a backend in Konnect
-- Creates a flat passthrough virtual cluster
-- Exposes Kafka on ports 19092-19190 with anonymous authentication
-- Gateway acts as a transparent proxy — no namespace isolation, no auth, no policies
+- Registers the 3-broker Kafka cluster as a backend in Konnect
+- Creates a single flat passthrough virtual cluster (`core-proxy`)
+- Exposes Kafka on ports 19092–19190 with anonymous authentication
+- Gateway is transparent — clients see exactly what's on the broker
 
 ## How to Use
 
@@ -18,66 +31,40 @@ This example demonstrates the basic proxy functionality of Kong Event Gateway �
 # Prerequisites: Kafka running, cert registered, konnect.env configured
 # See root README for bootstrap instructions.
 
-# Apply the phase configuration:
 kongctl apply -f kongctl/config.yaml
 
-# Test with kafkactl:
 kafkactl config use-context core-proxy
 kafkactl get topics
-kafkactl create topic hello-world
-kafkactl produce hello-world --value="Hello via KEG!"
-kafkactl consume hello-world --from-beginning --exit
+kafkactl create topic nw.ops.test.hello-world.v1
+kafkactl produce nw.ops.test.hello-world.v1 --value="Hello from Northwind via KEG!"
+kafkactl consume nw.ops.test.hello-world.v1 --from-beginning --exit
 ```
-
-## Configuration Details
-
-The configuration in `phase-1-basic-proxy.yaml` defines:
-
-- **Backend cluster**: Points to the 3 Kafka brokers (kafka1:9092, kafka2:9092, kafka3:9092)
-- **Listener**: Port range 19092-19190, with a `forward_to_virtual_cluster` policy
-- **Virtual cluster**: Flat passthrough (`acl_mode: passthrough`), anonymous authentication
 
 ## Key Concepts
 
 - **Backend Cluster**: Defines the upstream Kafka brokers the gateway connects to
-- **Listener**: A port or port range that clients connect to
-- **Virtual Cluster**: A tenant/domain isolation unit that maps clients to a backend
+- **Listener**: A port range that clients connect to on the gateway
+- **Virtual Cluster**: A tenant isolation unit; here it's a flat passthrough with no transformation
 - **Port Mapping**: Routes traffic from a listener port range to a specific virtual cluster
 
 ## Testing
 
-Using kafkactl, you can test both direct and proxied connections:
-
 ```bash
-# Direct connection to Kafka:
+# Direct connection (bypasses gateway):
 kafkactl config use-context default
 kafkactl get topics
 
-# Connection through gateway proxy:
+# Through the gateway proxy:
 kafkactl config use-context core-proxy
 kafkactl get topics
 ```
 
-Both should show the same topics — the gateway is transparent.
+Both show the same topics — the gateway is fully transparent at this phase.
 
-## Lifecycle
-
-When you move to the next phase, apply the new phase file — it replaces the entire configuration:
+## Next
 
 ```bash
 kongctl apply -f ../03-topic-filter/kongctl/config.yaml
 ```
 
-## Next Steps
-
-After mastering this basic setup, explore:
-- [Topic Filter](../03-topic-filter/kongctl/config.yaml) — namespace isolation  
-- [Auth Mediation](../04-auth-mediation/kongctl/config.yaml) — SASL/PLAIN authentication  
-- [ACL Enforcement](../05-acl-enforcement/kongctl/config.yaml) — gateway-level ACLs
-- [Encryption](../06-encryption/kongctl/config.yaml) — message-level encryption
-- [Schema Validation](../07-schema-validation/kongctl/config.yaml) — schema enforcement
-
-## See Also
-
-- [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)
-- [kongctl CLI Reference](https://konghq.com/products/kong-konnect/event-gateway)
+Moves to Phase 2: tenant namespace isolation for Retail Banking NY and Wealth Management LA.

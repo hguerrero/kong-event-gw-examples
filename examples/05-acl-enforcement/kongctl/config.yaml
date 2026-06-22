@@ -2,10 +2,10 @@
 # Phase 5 — ACL Enforcement
 #
 # What this adds (on top of phase-4):
-#   - Switches Team B from passthrough ACLs to enforce_on_gateway
+#   - Switches Wealth Management LA from passthrough ACLs to enforce_on_gateway
 #   - Defines explicit allow rules for topics and consumer groups
-#   - Unauthenticated requests to Team B are now rejected
-#   - Team A remains in passthrough mode to demonstrate contrast
+#   - Unauthenticated requests to Wealth Management LA are now rejected
+#   - Retail Banking NY remains in passthrough mode to demonstrate contrast
 #
 # Based on: examples/05-acl-enforcement
 #
@@ -65,69 +65,69 @@ event_gateways:
               bootstrap_port: none
               min_broker_id: 0
 
-      - ref: team-a-listener
-        name: team-a-listener
+      - ref: retail-banking-ny-listener
+        name: retail-banking-ny-listener
         labels:
           env: example
           role: ingress
-          team: team-a
+          business-unit: retail-banking-ny
         addresses: ["0.0.0.0"]
         ports: ["19192-19290"]
         policies:
-          - ref: forward-to-team-a
+          - ref: forward-to-retail-banking-ny
             type: forward_to_virtual_cluster
-            name: forward-to-team-a
+            name: forward-to-retail-banking-ny
             labels:
               env: example
               role: routing
-              team: team-a
+              business-unit: retail-banking-ny
             config:
               type: port_mapping
               destination:
-                id: !ref team-a
+                id: !ref retail-banking-ny
               advertised_host: localhost
               bootstrap_port: none
               min_broker_id: 0
 
-      - ref: team-b-listener
-        name: team-b-listener
+      - ref: wealth-management-la-listener
+        name: wealth-management-la-listener
         labels:
           env: example
           role: ingress
-          team: team-b
+          business-unit: wealth-management-la
         addresses: ["0.0.0.0"]
         ports: ["19292-19390"]
         policies:
-          - ref: forward-to-team-b
+          - ref: forward-to-wealth-management-la
             type: forward_to_virtual_cluster
-            name: forward-to-team-b
+            name: forward-to-wealth-management-la
             labels:
               env: example
               role: routing
-              team: team-b
+              business-unit: wealth-management-la
             config:
               type: port_mapping
               destination:
-                id: !ref team-b
+                id: !ref wealth-management-la
               advertised_host: localhost
               bootstrap_port: none
               min_broker_id: 0
 
     virtual_clusters:
-      - ref: team-a
-        name: team-a
-        description: Team A — anonymous access, passthrough ACLs
+      - ref: retail-banking-ny
+        name: retail-banking-ny
+        description: Retail Banking NY — anonymous access, passthrough ACLs
         labels:
           env: example
           role: virtual-cluster
-          team: team-a
+          business-unit: retail-banking-ny
         destination:
           id: !ref local-kafka
         acl_mode: passthrough
-        dns_label: team-a
+        dns_label: retail-banking-ny
         namespace:
           mode: hide_prefix
-          prefix: "A."
+          prefix: "RETAIL_NY."
           additional:
             topics:
               - type: glob
@@ -135,20 +135,20 @@ event_gateways:
         authentication:
           - type: anonymous
 
-      - ref: team-b
-        name: team-b
-        description: Team B — ACL enforcement at the gateway
+      - ref: wealth-management-la
+        name: wealth-management-la
+        description: Wealth Management LA — ACL enforcement at the gateway
         labels:
           env: example
           role: virtual-cluster
-          team: team-b
+          business-unit: wealth-management-la
         destination:
           id: !ref local-kafka
         acl_mode: enforce_on_gateway
-        dns_label: team-b
+        dns_label: wealth-management-la
         namespace:
           mode: hide_prefix
-          prefix: "B."
+          prefix: "WEALTH_LA."
           additional:
             topics:
               - type: glob
@@ -158,18 +158,18 @@ event_gateways:
           - type: sasl_plain
             mediation: terminate
             principals:
-              - username: team-b-user
+              - username: wealth-advisors
                 password: secret
 
         cluster_policies:
-          - ref: acl-team-b-readonly
+          - ref: acl-wealth-management-la
             type: acls
-            name: acl-team-b-readonly
+            name: acl-wealth-management-la
             labels:
               env: example
               role: access-control
-              team: team-b
-            condition: "context.auth.principal.name != 'team-b-user'"
+              business-unit: wealth-management-la
+            condition: "context.auth.principal.name != 'wealth-advisors'"
             config:
               rules:
                 - action: allow
@@ -186,14 +186,14 @@ event_gateways:
                   resource_names:
                     - match: "*"
 
-          - ref: acl-team-b-fullaccess
+          - ref: acl-wealth-management-la-advisors
             type: acls
-            name: acl-team-b-fullaccess
+            name: acl-wealth-management-la-advisors
             labels:
               env: example
               role: access-control
-              team: team-b
-            condition: "context.auth.principal.name == 'team-b-user'"
+              business-unit: wealth-management-la
+            condition: "context.auth.principal.name == 'wealth-advisors'"
             config:
               rules:
                 - action: allow

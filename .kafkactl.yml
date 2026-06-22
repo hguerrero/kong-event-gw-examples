@@ -8,25 +8,25 @@ contexts:
     redpanda:
       brokers:
         - localhost:9192
-    team-a:
+    retail-banking-ny:
       brokers:
         - localhost:19192
-    team-b:
+    wealth-management-la:
       brokers:
         - localhost:19292
-    team-b-authed:
+    wealth-advisors:
       brokers:
         - localhost:19292
       sasl:
         enabled: true
-        username: team-b-user
+        username: wealth-advisors
         password: secret
-    team-b-schema:
+    wealth-advisors-schema:
       brokers:
         - localhost:19292
       sasl:
         enabled: true
-        username: team-b-user
+        username: wealth-advisors
         password: secret
       schemaRegistry:
         url: http://localhost:8080/apis/ccompat/v7

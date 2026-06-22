@@ -1,43 +1,68 @@
-# Topic Filter Example — Namespace Isolation
+# Phase 2 — Tenant Isolation: Retail Banking NY and Wealth Management LA
 
-This example demonstrates how to configure Kong Event Gateway with multiple virtual clusters, each with isolated topic namespaces using prefix-based filtering.
+Northwind Financial's two business units have been stepping on each other's consumer groups. Retail branch apps occasionally drift into Wealth topics because all services share the same bootstrap servers. This phase puts each business unit behind its own virtual cluster with a namespace prefix — they can only see their own topics.
 
-> **Note:** This example uses a kongctl configuration at
-> [`kongctl/config.yaml`](kongctl/config.yaml).
+## Setup Diagram
+
+```mermaid
+flowchart TD
+    C1["🏦 Branch App\nanonymous"] -->|":19192"| RVC
+    C2["💼 Advisor App\nanonymous"] -->|":19292"| WVC
+    C3["⚙️ Ops / Core\nanonymous"] -->|":19092"| CVC
+
+    subgraph DP["KEG Data Plane"]
+        CVC["core-proxy VC\npassthrough · all topics"]
+        RVC["retail-banking-ny VC\nprefix RETAIL_NY.\nhides WEALTH_LA.*"]
+        WVC["wealth-management-la VC\nprefix WEALTH_LA.\nhides RETAIL_NY.*"]
+    end
+
+    subgraph K["Kafka Cluster"]
+        T1["RETAIL_NY.payments.card-dispatch.v1\nRETAIL_NY.markets.exchange-ticker.v1\nRETAIL_NY.branches.commuter-foot-traffic.v1"]
+        T2["WEALTH_LA.clients.sentiment-signals.v1\nWEALTH_LA.advisor.daily-client-activity.v1\nWEALTH_LA.portfolios.esg-allocation-adjustments.v1"]
+        T3["nw.* shared topics\ninfosec.security.*"]
+    end
+
+    RVC -->|"RETAIL_NY.* + nw.*"| T1
+    RVC -->|"injected"| T3
+    WVC -->|"WEALTH_LA.* + nw.*"| T2
+    WVC -->|"injected"| T3
+    CVC --> T1 & T2 & T3
+```
 
 ## What It Does
 
 - Two virtual clusters with namespace prefix isolation
-- **team-a** (ports 19192-19290): prefix `A.` — clients see unprefixed topics
-- **team-b** (ports 19292-19390): prefix `B.` — clients see unprefixed topics
-- Shared topics (`nw.*`) injected into both views
-- Transparent prefix handling for clients
+- **retail-banking-ny** (ports 19192–19290): prefix `RETAIL_NY.` — Retail branch services
+- **wealth-management-la** (ports 19292–19390): prefix `WEALTH_LA.` — Wealth advisory services
+- Shared `nw.*` topics injected into both views via `additional.topics`
+- Each business unit sees only its own topics — cross-unit topics are invisible
 
 ## How to Use
 
 ```bash
-# Apply the phase configuration:
 kongctl apply -f kongctl/config.yaml
 
-# Test Team A through the gateway:
-kafkactl config use-context team-a
+# Retail Banking NY view:
+kafkactl config use-context retail-banking-ny
 kafkactl get topics
+# → payments.card-dispatch.v1, markets.exchange-ticker.v1, nw.*, ...
 
-# Test Team B through the gateway:
-kafkactl config use-context team-b
+# Wealth Management LA view:
+kafkactl config use-context wealth-management-la
 kafkactl get topics
+# → clients.sentiment-signals.v1, advisor.daily-client-activity.v1, nw.*, ...
 ```
 
 ## Configuration Details
 
-The phase-2 configuration uses the `namespace` block with `hide_prefix` mode:
+The namespace block strips the prefix transparently for clients:
 
 ```yaml
 virtual_clusters:
-  - ref: team-a
+  - ref: retail-banking-ny
     namespace:
       mode: hide_prefix
-      prefix: "A."
+      prefix: "RETAIL_NY."
       additional:
         topics:
           - type: glob
@@ -46,50 +71,12 @@ virtual_clusters:
       - type: anonymous
 ```
 
-### How Namespace Isolation Works
+The prefix is automatically stripped on consume and added on produce. Clients never see `RETAIL_NY.` — the gateway handles the translation.
 
-- Topics on the broker are stored with the prefix (e.g., `A.orders.v1`)
-- Clients connecting through team-a's listener port (19192-19290) see `orders.v1`
-- The prefix is automatically stripped on consume and added on produce
-- `additional.topics` injects shared topics (like `nw.*`) into each team's view
-
-### Port Allocation
-
-| Virtual Cluster | Listener Ports | Min Broker ID |
-|----------------|---------------|---------------|
-| core-proxy     | 19092-19190   | 0             |
-| team-a         | 19192-19290   | 0             |
-| team-b         | 19292-19390   | 0             |
-
-## Testing
-
-```bash
-# Create topics directly in Kafka:
-kafkactl config use-context default
-kafkactl create topic A.orders.v1 B.inventory.v1 A.payments.v1
-
-# Team A sees only their topics (without prefix):
-kafkactl config use-context team-a
-kafkactl get topics  # Shows: orders.v1, payments.v1
-
-# Team B sees only their topics (without prefix):
-kafkactl config use-context team-b
-kafkactl get topics  # Shows: inventory.v1
-```
-
-## Lifecycle
-
-This configuration builds on the Basic Proxy example. To move to auth mediation:
+## Next
 
 ```bash
 kongctl apply -f ../04-auth-mediation/kongctl/config.yaml
 ```
 
-## See Also
-
-- [Basic Proxy](../01-basic-proxy/kongctl/config.yaml)
-- [Auth Mediation](../04-auth-mediation/kongctl/config.yaml)
-- [ACL Enforcement](../05-acl-enforcement/kongctl/config.yaml)
-- [Encryption](../06-encryption/kongctl/config.yaml)
-- [Schema Validation](../07-schema-validation/kongctl/config.yaml)
-- [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)
+Moves to Phase 3: Wealth Management advisors authenticate with SASL/PLAIN at the gateway.

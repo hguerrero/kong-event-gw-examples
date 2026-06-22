@@ -1,27 +1,46 @@
-# Kong Event Gateway Examples
+# Kong Event Gateway Examples — Northwind Financial
 
 This repository contains progressive examples demonstrating Kong Event Gateway features using **kongctl** declarative configuration with Kong Konnect.
 
-Each example is self-contained in its own directory with its own `kongctl/config.yaml` configuration. Examples build on each other cumulatively — each includes all configuration from prior examples plus the new feature.
+The examples follow **Northwind Financial**, a mid-size financial services firm with two business units — **Retail Banking NY** and **Wealth Management LA** — sharing a single Kafka cluster with no isolation, no auth, and no policy enforcement. Each example adds one governance layer to that cluster.
 
-## Architecture
+Each example is self-contained with its own `kongctl/config.yaml`. Examples are cumulative — each includes all configuration from prior phases plus the new feature.
 
-```
-                        ┌──────────────────┐
-                        │  Konnect Control  │
-                        │  Plane (kongctl)  │
-                        └────────┬─────────┘
-                                 │ kongctl apply
-                        ┌────────▼─────────┐
-  kafkactl ────────────►│  KEG Data Plane  │◄──── kong/kong-event-gateway:latest
-  (port 19092-19389)    │  (localhost)      │
-                        └────────┬─────────┘
-                                 │
-                        ┌────────▼─────────┐
-                        │  Kafka Cluster   │
-                        │  (3 brokers)     │
-                        │  + Apicurio SR   │
-                        └──────────────────┘
+## The Business Problem
+
+> Northwind Financial runs a self-managed Kafka cluster that every service talks to directly.
+> No tenant boundaries. No credential management. No data policies. As the firm opens new
+> channels and onboards external partners, the infosec team realises their Kafka cluster is
+> a flat, shared bus where any misconfigured consumer can read everything.
+>
+> This example set follows their journey: from raw, unprotected Kafka → to a fully governed
+> event fabric managed by Kong Event Gateway — one phase at a time.
+
+## Architecture Overview
+
+```mermaid
+flowchart TD
+    KC["☁️ Konnect Control Plane\n(kongctl apply)"]
+
+    KC -->|TLS / mTLS| DP
+
+    subgraph DP["KEG Data Plane (localhost)"]
+        VC0["Northwind Core VC\npassthrough · port 19092–19190"]
+        VC1["Retail Banking NY VC\nprefix RETAIL_NY. · port 19192–19290"]
+        VC2["Wealth Management LA VC\nprefix WEALTH_LA. · port 19292–19390"]
+    end
+
+    C0["kafkactl\ncore-proxy"] -->|":19092"| VC0
+    C1["kafkactl\nretail-banking-ny"] -->|":19192"| VC1
+    C2["kafkactl\nwealth-management-la\nwealth-advisors"] -->|":19292"| VC2
+
+    VC0 --> K
+    VC1 --> K
+    VC2 --> K
+
+    subgraph K["Kafka Cluster"]
+        B["3-broker KRaft\n+ Apicurio Schema Registry"]
+    end
 ```
 
 ## Prerequisites
@@ -87,92 +106,27 @@ docker compose up -d
 
 Apply them in order — each replaces the previous configuration with one that adds new capabilities:
 
-| # | Directory | kongctl Apply | Feature | Topic Alias |
-|---|-----------|--------------|---------|-------------|
-| 1 | [`examples/01-basic-proxy/`](examples/01-basic-proxy/README.md) | `kongctl apply -f examples/01-basic-proxy/kongctl/config.yaml` | Backend cluster + flat passthrough VC | — |
-| 2 | [`examples/03-topic-filter/`](examples/03-topic-filter/README.md) | `kongctl apply -f examples/03-topic-filter/kongctl/config.yaml` | Multi-VC namespace isolation | [`02-topic-alias`](examples/02-topic-alias/README.md) (CEL concept) |
-| 3 | [`examples/04-auth-mediation/`](examples/04-auth-mediation/README.md) | `kongctl apply -f examples/04-auth-mediation/kongctl/config.yaml` | SASL/PLAIN auth termination | — |
-| 4 | [`examples/05-acl-enforcement/`](examples/05-acl-enforcement/README.md) | `kongctl apply -f examples/05-acl-enforcement/kongctl/config.yaml` | ACL enforcement on Team B | — |
-| 5 | [`examples/06-encryption/`](examples/06-encryption/README.md) | `kongctl apply -f examples/06-encryption/kongctl/config.yaml` | Encrypt/decrypt policies | — |
-| 6 | [`examples/07-schema-validation/`](examples/07-schema-validation/README.md) | `kongctl apply -f examples/07-schema-validation/kongctl/config.yaml` | Schema validation + ACLs | — |
+| # | Directory | Feature |
+|---|-----------|---------|
+| 1 | [`examples/01-basic-proxy/`](examples/01-basic-proxy/README.md) | Backend cluster + flat passthrough VC |
+| 2 | [`examples/03-topic-filter/`](examples/03-topic-filter/README.md) | Tenant isolation — Retail NY and Wealth LA namespaces |
+| 3 | [`examples/04-auth-mediation/`](examples/04-auth-mediation/README.md) | SASL/PLAIN auth termination for Wealth Management |
+| 4 | [`examples/05-acl-enforcement/`](examples/05-acl-enforcement/README.md) | Gateway-enforced ACLs with identity-based conditions |
+| 5 | [`examples/06-encryption/`](examples/06-encryption/README.md) | Field-level encryption on wire transfer events |
+| 6 | [`examples/07-schema-validation/`](examples/07-schema-validation/README.md) | Schema validation on fraud risk score topics |
 
-### [1 — Basic Proxy](examples/01-basic-proxy/README.md)
-
-```bash
-kongctl apply -f examples/01-basic-proxy/kongctl/config.yaml
-kafkactl config use-context core-proxy
-kafkactl get topics
-```
-
-Registers the Kafka backend and exposes it through a flat passthrough virtual cluster. No namespace isolation, no auth, no policies — just a transparent proxy.
-
-### [2 — Topic Filter (Namespace Isolation)](examples/03-topic-filter/README.md)
-
-```bash
-kongctl apply -f examples/03-topic-filter/kongctl/config.yaml
-kafkactl config use-context team-a
-kafkactl get topics
-```
-
-Adds two namespace-isolated VCs:
-- **team-a** (ports 19192-19290): prefix `A.`
-- **team-b** (ports 19292-19390): prefix `B.`
-
-### [3 — Auth Mediation](examples/04-auth-mediation/README.md)
-
-```bash
-kongctl apply -f examples/04-auth-mediation/kongctl/config.yaml
-kafkactl config use-context team-b-authed
-kafkactl get topics
-```
-
-Adds SASL/PLAIN authentication to Team B with `mediation: terminate`.
-
-### [4 — ACL Enforcement](examples/05-acl-enforcement/README.md)
-
-```bash
-kongctl apply -f examples/05-acl-enforcement/kongctl/config.yaml
-```
-
-Switches Team B from passthrough to `enforce_on_gateway` ACL mode with two-tier rules: read-only for anonymous, full access for authenticated users.
-
-### [5 — Message Encryption](examples/06-encryption/README.md)
-
-```bash
-export TRANSACTION_ENCRYPTION_KEY=$(openssl rand -base64 32)
-kongctl apply -f examples/06-encryption/kongctl/config.yaml
-```
-
-Adds field-level encryption for high-value wire transfer events (produce encrypt, consume decrypt).
-
-### [6 — Schema Validation](examples/07-schema-validation/README.md)
-
-```bash
-export TRANSACTION_ENCRYPTION_KEY=$(openssl rand -base64 32)
-kongctl apply -f examples/07-schema-validation/kongctl/config.yaml
-```
-
-Adds Apicurio Schema Registry with schema validation on fraud risk score topics.
-
-## Variants (Alternative Backends)
-
-These replace the local Kafka backend entirely (apply instead of the phases above):
-
-| Directory | kongctl Apply | Backend |
-|-----------|--------------|---------|
-| [`examples/A1-confluent-cloud/`](examples/A1-confluent-cloud/README.md) | `kongctl apply -f examples/A1-confluent-cloud/kongctl/config.yaml` | Confluent Cloud (SASL/PLAIN + TLS) |
-| [`examples/A2-redpanda/`](examples/A2-redpanda/README.md) | `kongctl apply -f examples/A2-redpanda/kongctl/config.yaml` | Redpanda |
+Topic alias (CEL-based name rewriting) is documented as a concept reference in [`examples/02-topic-alias/`](examples/02-topic-alias/README.md).
 
 ## Testing with kafkactl
 
-| Context | Port | Auth | Notes |
-|---------|------|------|-------|
-| `default` | 9092 | None | Direct to Kafka |
-| `core-proxy` | 19092 | Anonymous | Flat passthrough VC |
-| `team-a` | 19192 | Anonymous | Team A namespace |
-| `team-b` | 19292 | Anonymous | Team B (read-only via ACLs) |
-| `team-b-authed` | 19292 | SASL/PLAIN | Team B (team-b-user/secret, full access) |
-| `team-b-schema` | 19292 | SASL/PLAIN + SR | Team B with Schema Registry |
+| Context | Port | Auth | Business Unit |
+|---------|------|------|---------------|
+| `default` | 9092 | None | Direct to Kafka (no gateway) |
+| `core-proxy` | 19092 | Anonymous | Northwind Core — all topics visible |
+| `retail-banking-ny` | 19192 | Anonymous | Retail Banking NY namespace |
+| `wealth-management-la` | 19292 | Anonymous | Wealth Management LA (read-only via ACLs) |
+| `wealth-advisors` | 19292 | SASL/PLAIN | Wealth Mgmt — elevated access incl. infosec |
+| `wealth-advisors-schema` | 19292 | SASL/PLAIN + SR | Wealth Mgmt — with Schema Registry |
 
 ```bash
 kafkactl config use-context core-proxy
@@ -188,8 +142,8 @@ kafkactl get topics
 | `KONG_KONNECT_GATEWAY_CLUSTER_ID` | Yes | Gateway cluster ID from Konnect |
 | `KONG_KONNECT_CLIENT_CERT` | Yes | Data plane TLS certificate (PEM) |
 | `KONG_KONNECT_CLIENT_KEY` | Yes | Data plane TLS private key (PEM) |
-| `KAFKA_USERNAME` | Variant | Confluent Cloud username |
-| `KAFKA_PASSWORD` | Variant | Confluent Cloud password |
+| `KAFKA_USERNAME` | Variant A1 | Confluent Cloud API key |
+| `KAFKA_PASSWORD` | Variant A1 | Confluent Cloud API secret |
 | `TRANSACTION_ENCRYPTION_KEY` | Examples 6-7 | Base64-encoded 32-byte encryption key |
 
 ## Directory Structure
@@ -200,42 +154,34 @@ kong-event-gw-examples/
 ├── kafka/
 │   ├── docker-compose.yaml          # Kafka cluster + Apicurio
 │   └── config/
-│       ├── topics.txt
+│       ├── topics.txt               # Northwind Financial topic list
 │       └── schemas/
 ├── kongctl/
 │   ├── certs/                       # TLS identity (gitignored)
-│   └── data_plane_certificate.yaml  # Register gateway in Konnect
+│   └── data_plane_certificate.yaml
 ├── examples/
 │   ├── 01-basic-proxy/
-│   │   ├── kongctl/config.yaml      # Phase 1 config
-│   │   └── README.md
-│   ├── 02-topic-alias/
-│   │   └── README.md                # CEL concept reference
+│   ├── 02-topic-alias/              # CEL concept reference
 │   ├── 03-topic-filter/
-│   │   ├── kongctl/config.yaml      # Phase 2 config
-│   │   └── README.md
 │   ├── 04-auth-mediation/
-│   │   ├── kongctl/config.yaml      # Phase 3 config
-│   │   └── README.md
 │   ├── 05-acl-enforcement/
-│   │   ├── kongctl/config.yaml      # Phase 4 config
-│   │   └── README.md
 │   ├── 06-encryption/
-│   │   ├── kongctl/config.yaml      # Phase 5 config
-│   │   └── README.md
 │   ├── 07-schema-validation/
-│   │   ├── kongctl/config.yaml      # Phase 6 config
-│   │   └── README.md
-│   ├── A1-confluent-cloud/
-│   │   ├── kongctl/config.yaml      # Confluent variant
-│   │   └── README.md
-│   └── A2-redpanda/
-│       ├── kongctl/config.yaml      # Redpanda variant
-│       └── README.md
+│   ├── A1-confluent-cloud/          # Confluent Cloud backend variant
+│   └── A2-redpanda/                 # Redpanda backend variant
 ├── konnect.env.example
 ├── .kafkactl.yml
 └── README.md
 ```
+
+## Variants (Alternative Backends)
+
+These replace the local Kafka backend entirely:
+
+| Directory | Backend |
+|-----------|---------|
+| [`examples/A1-confluent-cloud/`](examples/A1-confluent-cloud/README.md) | Confluent Cloud (SASL/PLAIN + TLS) |
+| [`examples/A2-redpanda/`](examples/A2-redpanda/README.md) | Redpanda |
 
 ## License
 

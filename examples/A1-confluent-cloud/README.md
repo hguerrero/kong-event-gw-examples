@@ -1,37 +1,48 @@
-# Confluent Cloud Integration Example
+# Variant A1 — Confluent Cloud Backend
 
-This example demonstrates how to configure Kong Event Gateway to connect to a Confluent Cloud Kafka cluster using SASL/PLAIN authentication and TLS encryption.
+Northwind Financial's cloud team is evaluating Confluent Cloud as a managed Kafka backend. This variant swaps the local 3-broker cluster for a Confluent Cloud cluster — everything else (virtual clusters, namespaces, auth, ACLs) stays the same. Apply this instead of the numbered phases if you want to run the examples against Confluent Cloud.
 
-> **Note:** This example uses a kongctl configuration at
-> [`kongctl/config.yaml`](kongctl/config.yaml).
+## Setup Diagram
+
+```mermaid
+flowchart LR
+    C["kafkactl\nanonymous"] -->|":19092"| G
+
+    subgraph G["KEG Data Plane"]
+        VC["core-proxy VC\nmediation: use_backend_cluster\nClient credentials never forwarded"]
+    end
+
+    G -->|"SASL/PLAIN + TLS\n(gateway's own API key)"| CC["☁️ Confluent Cloud\nKafka Cluster"]
+
+    ENV["🔑 KAFKA_USERNAME / KAFKA_PASSWORD\n(env vars — gateway only)"] -.->|"loaded at startup"| G
+```
 
 ## What It Does
 
-- Secure connection to Confluent Cloud with SASL/PLAIN authentication
-- TLS encryption for data in transit
-- Anonymous mediation — credentials stay at the gateway
-- Alternative backend to the local Kafka cluster
+- Connects to a Confluent Cloud cluster with SASL/PLAIN + TLS
+- Clients connect to the gateway anonymously — gateway holds the Confluent credentials
+- `mediation: use_backend_cluster` — gateway uses its own backend credentials, not the client's
 
 ## How to Use
 
 ```bash
-# 1. Set your Confluent Cloud credentials:
+# Set your Confluent Cloud API key and secret:
 export KAFKA_USERNAME=<your-confluent-cloud-api-key>
 export KAFKA_PASSWORD=<your-confluent-cloud-api-secret>
 
-# 2. Update bootstrap_servers in kongctl/variant-confluent-cloud.yaml
-#    with your Confluent Cloud endpoint
+# Update bootstrap_servers in kongctl/config.yaml with your Confluent Cloud endpoint:
+# bootstrap_servers:
+#   - <cluster-id>.us-east-1.aws.confluent.cloud:9092
 
-# 3. Apply the variant configuration (replaces any phase config):
+# Apply (replaces any phase config):
 kongctl apply -f kongctl/config.yaml
 
-# 4. Test the connection:
-kafkactl get topics --bootstrap-server localhost:9092
+# Test the connection:
+kafkactl config use-context core-proxy
+kafkactl get topics
 ```
 
 ## Configuration Details
-
-The variant configuration defines:
 
 ```yaml
 backend_clusters:
@@ -54,20 +65,13 @@ virtual_clusters:
         mediation: use_backend_cluster
 ```
 
-### Authentication Modes
-
-- **Anonymous mediation** (`use_backend_cluster`): Clients connect without credentials; gateway uses its own Confluent Cloud credentials to connect to the backend
-- **Credential forwarding** (`forward`): Clients provide SASL/PLAIN credentials that are forwarded to Confluent Cloud
-
 ## Variant vs Phase
 
-Variants are **alternative** configurations, not cumulative phases. Apply a variant
-instead of the phase files to use a different backend. The variant replaces the entire
-configuration on the gateway.
+This is an **alternative** backend, not a cumulative phase. Apply it instead of the numbered phases to use Confluent Cloud as the broker. The virtual cluster, namespace isolation, auth, and ACL features from the phase examples all work identically against Confluent Cloud.
 
 ## See Also
 
-- [Redpanda variant](../A2-redpanda/kongctl/config.yaml)
-- [Basic Proxy](../01-basic-proxy/kongctl/config.yaml)
+- [Redpanda variant](../A2-redpanda/README.md)
+- [Phase 1 — Basic Proxy](../01-basic-proxy/README.md)
 - [Kong Event Gateway Documentation](https://docs.konghq.com/gateway/)
 - [Confluent Cloud Documentation](https://docs.confluent.io/cloud/current/overview.html)

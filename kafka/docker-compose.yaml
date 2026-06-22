@@ -3,7 +3,6 @@ name: kafka_cluster
 networks:
   kafka:
     name: keg-network
-    external: true
 
 services:
   kafka1:

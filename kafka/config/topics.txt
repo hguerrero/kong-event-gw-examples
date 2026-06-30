@@ -21,3 +21,4 @@ RETAIL_NY.core.accounts.status.v2
 RETAIL_NY.core.customers.weather-impact-profiles.v1
 RETAIL_NY.payments.card-dispatch.v1
 nw.ops.test.hello-world.v1
+nw.crm.customers.kyc-profiles.v1

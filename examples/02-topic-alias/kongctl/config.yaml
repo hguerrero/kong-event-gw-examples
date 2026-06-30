@@ -1,0 +1,95 @@
+# ============================================================
+# Phase 2 — Topic Aliases (v1.2+)
+#
+# What this adds (on top of phase 1):
+#   - topic_aliases on the core-proxy virtual cluster, mapping
+#     friendly short names to the full internal Northwind topic names
+#
+# Clients connecting to core-proxy can use 'prospects' and
+# 'market-data' as topic names. The gateway resolves them to
+# the real backend topics transparently.
+#
+# Requires: Event Gateway 1.2+
+#
+# Based on: examples/02-topic-alias
+#
+# Apply:
+#   kongctl apply -f examples/02-topic-alias/kongctl/config.yaml
+# ============================================================
+
+_defaults:
+  kongctl:
+    namespace: keg-examples
+
+event_gateways:
+  - ref: keg-examples-gateway
+    name: keg-examples-gateway
+    description: Kong Event Gateway Examples — local Kafka cluster
+    labels:
+      env: example
+      project: keg-examples
+
+    backend_clusters:
+      - ref: local-kafka
+        name: local-kafka
+        description: 3-broker KRaft Kafka cluster running in Docker
+        labels:
+          env: example
+          role: message-broker
+          tier: backend
+        authentication:
+          type: anonymous
+        bootstrap_servers:
+          - kafka1:9092
+          - kafka2:9092
+          - kafka3:9092
+        tls:
+          enabled: false
+        insecure_allow_anonymous_virtual_cluster_auth: true
+
+    listeners:
+      - ref: core-listener
+        name: core-listener
+        labels:
+          env: example
+          role: ingress
+        addresses:
+          - "0.0.0.0"
+        ports:
+          - "19092-19190"
+        policies:
+          - ref: forward-to-core-proxy
+            type: forward_to_virtual_cluster
+            name: forward-to-core-proxy
+            labels:
+              env: example
+              role: routing
+            config:
+              type: port_mapping
+              destination:
+                id: !ref core-proxy
+              advertised_host: localhost
+              bootstrap_port: none
+              min_broker_id: 0
+
+    virtual_clusters:
+      - ref: core-proxy
+        name: core-proxy
+        description: >-
+          Flat passthrough virtual cluster. Phase 2 adds topic aliases so
+          clients can use friendly short names alongside the full topic names.
+        labels:
+          env: example
+          role: virtual-cluster
+          tier: core
+        destination:
+          id: !ref local-kafka
+        acl_mode: passthrough
+        dns_label: core-proxy
+        authentication:
+          - type: anonymous
+        topic_aliases:
+          - alias: prospects
+            topic: nw.crm.advisory.prospect-locations.v1
+          # - alias: market-data
+          #   topic: nw.analytics.forecasting.market-weather.v1

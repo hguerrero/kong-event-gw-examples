@@ -1,0 +1,365 @@
+# ============================================================
+# Phase 8 — Field-Level Encryption (v1.2+)
+#
+# What this adds (on top of phase-6):
+#   - Field-level encryption of specific JSON fields in produce
+#   - Field-level decryption of specific JSON fields in consume
+#   - Schema validation (JSON) gating the encrypt/decrypt policies
+#
+# Unlike phase 6 (whole-message encryption), this encrypts only
+# selected fields within a JSON message value. Other fields
+# remain plaintext — consumers can inspect non-sensitive fields
+# without decrypting the full payload.
+#
+# Example: produces {"personal":{"ssn":"100-00-00001","name":"Alice"}}
+#          stored as {"personal":{"ssn":"<ciphertext>","name":"Alice"}}
+#          consumers receive the original plaintext transparently
+#
+# Requires: Event Gateway 1.2+
+#
+# Required env vars:
+#   FIELD_ENCRYPTION_KEY — base64-encoded 32-byte key
+#   export FIELD_ENCRYPTION_KEY=$(openssl rand -base64 32)
+#
+# Based on: examples/08-field-encryption
+#
+# Apply:
+#   kongctl apply -f examples/08-field-encryption/kongctl/config.yaml
+# ============================================================
+
+_defaults:
+  kongctl:
+    namespace: keg-examples
+
+event_gateways:
+  - ref: keg-examples-gateway
+    name: keg-examples-gateway
+    description: Kong Event Gateway Examples — local Kafka cluster
+    min_runtime_version: "1.2"
+    labels:
+      env: example
+      project: keg-examples
+
+    backend_clusters:
+      - ref: local-kafka
+        name: local-kafka
+        labels:
+          env: example
+          role: message-broker
+          tier: backend
+        authentication:
+          type: anonymous
+        bootstrap_servers:
+          - kafka1:9092
+          - kafka2:9092
+          - kafka3:9092
+        tls:
+          enabled: false
+        insecure_allow_anonymous_virtual_cluster_auth: true
+
+    static_keys:
+      - ref: transaction-encryption-key
+        name: transaction-encryption-key
+        description: Encryption key for high-value wire transfer events (whole-message)
+        labels:
+          env: example
+          role: encryption-key
+        value: !env TRANSACTION_ENCRYPTION_KEY
+
+      - ref: field-encryption-key
+        name: field-encryption-key
+        description: Encryption key for field-level encryption of sensitive JSON fields
+        labels:
+          env: example
+          role: encryption-key
+        value: !env FIELD_ENCRYPTION_KEY
+
+    listeners:
+      - ref: core-listener
+        name: core-listener
+        labels:
+          env: example
+          role: ingress
+        addresses: ["0.0.0.0"]
+        ports: ["19092-19190"]
+        policies:
+          - ref: forward-to-core-proxy
+            type: forward_to_virtual_cluster
+            name: forward-to-core-proxy
+            labels:
+              env: example
+              role: routing
+            config:
+              type: port_mapping
+              destination:
+                id: !ref core-proxy
+              advertised_host: localhost
+              bootstrap_port: none
+              min_broker_id: 0
+
+      - ref: retail-banking-ny-listener
+        name: retail-banking-ny-listener
+        labels:
+          env: example
+          role: ingress
+          business-unit: retail-banking-ny
+        addresses: ["0.0.0.0"]
+        ports: ["19192-19290"]
+        policies:
+          - ref: forward-to-retail-banking-ny
+            type: forward_to_virtual_cluster
+            name: forward-to-retail-banking-ny
+            labels:
+              env: example
+              role: routing
+              business-unit: retail-banking-ny
+            config:
+              type: port_mapping
+              destination:
+                id: !ref retail-banking-ny
+              advertised_host: localhost
+              bootstrap_port: none
+              min_broker_id: 0
+
+      - ref: wealth-management-la-listener
+        name: wealth-management-la-listener
+        labels:
+          env: example
+          role: ingress
+          business-unit: wealth-management-la
+        addresses: ["0.0.0.0"]
+        ports: ["19292-19390"]
+        policies:
+          - ref: forward-to-wealth-management-la
+            type: forward_to_virtual_cluster
+            name: forward-to-wealth-management-la
+            labels:
+              env: example
+              role: routing
+              business-unit: wealth-management-la
+            config:
+              type: port_mapping
+              destination:
+                id: !ref wealth-management-la
+              advertised_host: localhost
+              bootstrap_port: none
+              min_broker_id: 0
+
+    virtual_clusters:
+      - ref: retail-banking-ny
+        name: retail-banking-ny
+        description: Retail Banking NY — anonymous access
+        labels:
+          env: example
+          role: virtual-cluster
+          business-unit: retail-banking-ny
+        destination:
+          id: !ref local-kafka
+        acl_mode: passthrough
+        dns_label: retail-banking-ny
+        namespace:
+          mode: hide_prefix
+          prefix: "RETAIL_NY."
+          additional:
+            topics:
+              - type: glob
+                glob: "nw.*"
+        authentication:
+          - type: anonymous
+
+      - ref: wealth-management-la
+        name: wealth-management-la
+        description: Wealth Management LA — ACL enforcement at the gateway
+        labels:
+          env: example
+          role: virtual-cluster
+          business-unit: wealth-management-la
+        destination:
+          id: !ref local-kafka
+        acl_mode: enforce_on_gateway
+        dns_label: wealth-management-la
+        namespace:
+          mode: hide_prefix
+          prefix: "WEALTH_LA."
+          additional:
+            topics:
+              - type: glob
+                glob: "nw.*"
+        authentication:
+          - type: anonymous
+          - type: sasl_plain
+            mediation: terminate
+            principals:
+              - username: wealth-advisors
+                password: secret
+
+        cluster_policies:
+          - ref: acl-wealth-management-la
+            type: acls
+            name: acl-wealth-management-la
+            labels:
+              env: example
+              role: access-control
+              business-unit: wealth-management-la
+            condition: "context.auth.principal.name != 'wealth-advisors'"
+            config:
+              rules:
+                - action: allow
+                  resource_type: topic
+                  operations:
+                    - name: describe
+                    - name: read
+                  resource_names:
+                    - match: "*"
+                - action: allow
+                  resource_type: group
+                  operations:
+                    - name: read
+                  resource_names:
+                    - match: "*"
+
+          - ref: acl-wealth-management-la-advisors
+            type: acls
+            name: acl-wealth-management-la-advisors
+            labels:
+              env: example
+              role: access-control
+              business-unit: wealth-management-la
+            condition: "context.auth.principal.name == 'wealth-advisors'"
+            config:
+              rules:
+                - action: allow
+                  resource_type: topic
+                  operations:
+                    - name: describe
+                    - name: read
+                    - name: write
+                  resource_names:
+                    - match: "*"
+                - action: allow
+                  resource_type: group
+                  operations:
+                    - name: describe
+                    - name: read
+                    - name: write
+                    - name: create
+                  resource_names:
+                    - match: "*"
+
+      - ref: core-proxy
+        name: core-proxy
+        description: >-
+          Flat passthrough virtual cluster. Phase 8 adds field-level encryption
+          on customer data topics alongside whole-message encryption for wire transfers.
+        labels:
+          env: example
+          role: virtual-cluster
+          tier: core
+        destination:
+          id: !ref local-kafka
+        acl_mode: passthrough
+        dns_label: core-proxy
+        authentication:
+          - type: anonymous
+
+        produce_policies:
+          # Whole-message encryption for high-value wire transfers (from phase 6)
+          - ref: wire-transfer-encryption-policy
+            type: encrypt
+            name: wire-transfer-encryption-policy
+            labels:
+              env: example
+              role: encryption
+            description: Encrypts high-value wire transfer event values before they reach the broker
+            condition: 'context.topic.name == "nw.ledger.transactions.high-value-wire-transfers.v1"'
+            config:
+              failure_mode: error
+              part_of_record:
+                - value
+              encryption_key:
+                type: static
+                key:
+                  id: !ref transaction-encryption-key
+
+          # JSON schema validation — required before field encryption can parse the value
+          - ref: customer-data-json-validation
+            type: schema_validation
+            name: customer-data-json-validation
+            labels:
+              env: example
+              role: schema-validation
+            description: Validates that customer data messages are JSON-encoded before field encryption
+            condition: 'context.topic.name == "nw.crm.customers.kyc-profiles.v1"'
+            config:
+              type: json
+              value_validation_action: reject
+
+          # Field-level encryption — runs after JSON validation, encrypts personal.ssn
+          - ref: customer-data-field-encryption
+            type: encrypt_fields
+            name: customer-data-field-encryption
+            labels:
+              env: example
+              role: field-encryption
+            description: Encrypts sensitive customer fields (SSN) before the message reaches the broker
+            condition: 'context.topic.name == "nw.crm.customers.kyc-profiles.v1"'
+            parent_policy_id: !ref customer-data-json-validation
+            config:
+              failure_mode: reject
+              encrypt_fields:
+                - paths:
+                    - match: "personal.ssn"
+                  encryption_key:
+                    type: static
+                    key:
+                      name: field-encryption-key
+
+        consume_policies:
+          # Whole-message decryption for high-value wire transfers (from phase 6)
+          - ref: wire-transfer-decryption-policy
+            type: decrypt
+            name: wire-transfer-decryption-policy
+            labels:
+              env: example
+              role: encryption
+            description: Decrypts high-value wire transfer events transparently for authorised consumers
+            condition: 'context.topic.name == "nw.ledger.transactions.high-value-wire-transfers.v1"'
+            config:
+              failure_mode: error
+              part_of_record:
+                - value
+              key_sources:
+                - type: static
+                  key:
+                    id: !ref transaction-encryption-key
+
+          # JSON schema validation on consume — marks invalid messages without blocking
+          - ref: customer-data-json-validation-consume
+            type: schema_validation
+            name: customer-data-json-validation-consume
+            labels:
+              env: example
+              role: schema-validation
+            description: Validates that customer data messages are JSON-encoded before field decryption
+            condition: 'context.topic.name == "nw.crm.customers.kyc-profiles.v1"'
+            config:
+              type: json
+              value_validation_action: mark
+
+          # Field-level decryption — transparently restores plaintext to the consumer
+          - ref: customer-data-field-decryption
+            type: decrypt_fields
+            name: customer-data-field-decryption
+            labels:
+              env: example
+              role: field-encryption
+            description: Decrypts sensitive customer fields (SSN) transparently for authorised consumers
+            condition: 'context.topic.name == "nw.crm.customers.kyc-profiles.v1"'
+            parent_policy_id: !ref customer-data-json-validation-consume
+            config:
+              failure_mode: error
+              key_sources:
+                - type: static
+              decrypt_fields:
+                paths:
+                  - match: "personal.ssn"

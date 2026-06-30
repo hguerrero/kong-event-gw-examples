@@ -1,5 +1,7 @@
 # Kong Event Gateway Examples — Northwind Financial
 
+> **Kong Event Gateway 1.2**
+
 This repository contains progressive examples demonstrating Kong Event Gateway features using **kongctl** declarative configuration with Kong Konnect.
 
 The examples follow **Northwind Financial**, a mid-size financial services firm with two business units — **Retail Banking NY** and **Wealth Management LA** — sharing a single Kafka cluster with no isolation, no auth, and no policy enforcement. Each example adds one governance layer to that cluster.
@@ -106,16 +108,16 @@ docker compose up -d
 
 Apply them in order — each replaces the previous configuration with one that adds new capabilities:
 
-| # | Directory | Feature |
-|---|-----------|---------|
-| 1 | [`examples/01-basic-proxy/`](examples/01-basic-proxy/README.md) | Backend cluster + flat passthrough VC |
-| 2 | [`examples/03-topic-filter/`](examples/03-topic-filter/README.md) | Tenant isolation — Retail NY and Wealth LA namespaces |
-| 3 | [`examples/04-auth-mediation/`](examples/04-auth-mediation/README.md) | SASL/PLAIN auth termination for Wealth Management |
-| 4 | [`examples/05-acl-enforcement/`](examples/05-acl-enforcement/README.md) | Gateway-enforced ACLs with identity-based conditions |
-| 5 | [`examples/06-encryption/`](examples/06-encryption/README.md) | Field-level encryption on wire transfer events |
-| 6 | [`examples/07-schema-validation/`](examples/07-schema-validation/README.md) | Schema validation on fraud risk score topics |
-
-Topic alias (CEL-based name rewriting) is documented as a concept reference in [`examples/02-topic-alias/`](examples/02-topic-alias/README.md).
+| # | Directory | Feature | Min Version |
+|---|-----------|---------|-------------|
+| 1 | [`examples/01-basic-proxy/`](examples/01-basic-proxy/README.md) | Backend cluster + flat passthrough VC | — |
+| 2 | [`examples/02-topic-alias/`](examples/02-topic-alias/README.md) | Topic aliases — friendly names for backend topics | 1.2 |
+| 3 | [`examples/03-topic-filter/`](examples/03-topic-filter/README.md) | Tenant isolation — Retail NY and Wealth LA namespaces | — |
+| 4 | [`examples/04-auth-mediation/`](examples/04-auth-mediation/README.md) | SASL/PLAIN auth termination for Wealth Management | — |
+| 5 | [`examples/05-acl-enforcement/`](examples/05-acl-enforcement/README.md) | Gateway-enforced ACLs with identity-based conditions | — |
+| 6 | [`examples/06-encryption/`](examples/06-encryption/README.md) | Whole-message encryption on wire transfer events | — |
+| 7 | [`examples/07-schema-validation/`](examples/07-schema-validation/README.md) | Schema validation on fraud risk score topics | — |
+| 8 | [`examples/08-field-encryption/`](examples/08-field-encryption/README.md) | Field-level encryption of specific JSON fields | 1.2 |
 
 ## Testing with kafkactl
 
@@ -144,13 +146,14 @@ kafkactl get topics
 | `KONG_KONNECT_CLIENT_KEY` | Yes | Data plane TLS private key (PEM) |
 | `KAFKA_USERNAME` | Variant A1 | Confluent Cloud API key |
 | `KAFKA_PASSWORD` | Variant A1 | Confluent Cloud API secret |
-| `TRANSACTION_ENCRYPTION_KEY` | Examples 6-7 | Base64-encoded 32-byte encryption key |
+| `TRANSACTION_ENCRYPTION_KEY` | Examples 6–8 | Base64-encoded 32-byte key for wire transfer encryption |
+| `FIELD_ENCRYPTION_KEY` | Example 8 | Base64-encoded 32-byte key for field-level encryption |
 
 ## Directory Structure
 
 ```
 kong-event-gw-examples/
-├── docker-compose.yaml              # Gateway data plane
+├── docker-compose.yaml              # Gateway data plane (v1.2)
 ├── kafka/
 │   ├── docker-compose.yaml          # Kafka cluster + Apicurio
 │   └── config/
@@ -161,12 +164,13 @@ kong-event-gw-examples/
 │   └── data_plane_certificate.yaml
 ├── examples/
 │   ├── 01-basic-proxy/
-│   ├── 02-topic-alias/              # CEL concept reference
+│   ├── 02-topic-alias/              # Topic aliases (v1.2+)
 │   ├── 03-topic-filter/
 │   ├── 04-auth-mediation/
 │   ├── 05-acl-enforcement/
 │   ├── 06-encryption/
 │   ├── 07-schema-validation/
+│   ├── 08-field-encryption/         # Field-level encryption (v1.2+)
 │   ├── A1-confluent-cloud/          # Confluent Cloud backend variant
 │   └── A2-redpanda/                 # Redpanda backend variant
 ├── konnect.env.example
